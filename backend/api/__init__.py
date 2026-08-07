@@ -1,1 +1,1 @@
-"""API layer package."""
+"""API package for Jobyn AI Google Prototype MVP."""

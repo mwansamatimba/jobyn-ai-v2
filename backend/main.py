@@ -1,49 +1,67 @@
-"""FastAPI application factory and ASGI entrypoint.
+"""FastAPI application entry point for Jobyn AI."""
 
-Using a factory keeps the app free of import-time side effects beyond the
-database engine (see ``backend/database/session.py``), makes testing trivial,
-and lets tests inject an explicit :class:`Settings` instance if needed.
-"""
+from __future__ import annotations
 
-from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from typing import Any
 
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 
 from backend.api.router import api_router
-from backend.core.config import Settings, get_settings
+from backend.ai.gemini import (
+    GeminiConfigurationError,
+    get_gemini_client,
+)
 from backend.core.errors import register_exception_handlers
-from backend.utils.logging import configure_logging
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
-    """Build and configure the FastAPI application."""
-    settings = settings or get_settings()
-    configure_logging(settings.LOG_LEVEL)
-
-    @asynccontextmanager
-    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        yield
+def create_app() -> FastAPI:
 
     app = FastAPI(
-        title=settings.APP_NAME,
-        version=settings.APP_VERSION,
-        debug=settings.DEBUG,
-        lifespan=lifespan,
-    )
-
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=settings.BACKEND_CORS_ORIGINS,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        title="Jobyn AI",
+        description="AI-powered career intelligence platform",
+        version="2.0.0",
     )
 
     register_exception_handlers(app)
-    app.include_router(api_router, prefix=settings.API_V1_PREFIX)
+    app.include_router(api_router)
+
+    @app.get("/", tags=["system"])
+    async def root():
+        return {
+            "service": "Jobyn AI",
+            "status": "running",
+        }
+
+    @app.get("/api/v1/health", tags=["health"])
+    async def health_check():
+        return {
+            "status": "ok",
+            "service": "Jobyn AI",
+        }
+
+    @app.get("/api/v1/health/ready", tags=["health"])
+    async def readiness_check():
+        return {
+            "status": "ready",
+        }
+
+    @app.get("/api/v1/health/gemini", tags=["health"])
+    async def gemini_health() -> dict[str, Any]:
+        try:
+            client = get_gemini_client()
+        except GeminiConfigurationError:
+            return {
+                "gemini_configured": False,
+                "model": "",
+            }
+
+        return {
+            "gemini_configured": True,
+            "model": client.model,
+        }
+
     return app
+
 
 
 app = create_app()

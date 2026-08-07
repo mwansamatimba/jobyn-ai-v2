@@ -67,6 +67,7 @@
 *.egg
 **/.venv/
 **/venv/
+**/jobyn-env/
 **/ENV/
 **/.pytest_cache/
 **/.mypy_cache/

@@ -1,74 +1,114 @@
-"""FastAPI dependency injection wiring.
+"""Reusable FastAPI dependency injection module.
 
-This module is the composition root for request-scoped dependencies. Endpoints
-receive sessions, repositories, and services through ``Depends`` rather than
-constructing them directly, which keeps layers decoupled and testable.
-
-The ``get_current_token_payload`` dependency validates the ``Authorization:
-Bearer <jwt>`` header and returns the decoded claims, and
-``get_current_user`` resolves the token subject against the ``User`` model.
+Single source of truth for request-scoped dependencies: database sessions,
+repositories, services and the authenticated user. Route modules consume these
+dependencies instead of building repositories or services themselves.
 """
 
+from __future__ import annotations
+
 import uuid
-from collections.abc import AsyncIterator
-from typing import Any
+from collections.abc import AsyncGenerator
 
 from fastapi import Depends
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.core.errors import AuthenticationError
-from backend.core.security import decode_token
-from backend.database.session import async_session_factory
+from backend.auth.jwt import InvalidTokenError, verify_token
+from backend.database.session import async_session_maker
 from backend.models.user import User
 from backend.repositories.user import UserRepository
-from backend.services.user import UserService
-
-_bearer_scheme = HTTPBearer(auto_error=False)
+from backend.services.auth import AuthService
 
 
-async def get_db() -> AsyncIterator[AsyncSession]:
-    """Yield a request-scoped async session and ensure it is always closed."""
-    async with async_session_factory() as session:
+__all__ = [
+    "oauth2_scheme",
+    "get_session",
+    "get_user_repository",
+    "get_auth_service",
+    "get_current_user",
+]
+
+
+oauth2_scheme = OAuth2PasswordBearer(
+    tokenUrl="/auth/login"
+)
+
+
+async def get_session() -> AsyncGenerator[AsyncSession, None]:
+    """Yield a request-scoped async database session.
+
+    Only the session lifecycle is managed here; committing and rolling back
+    are left to the surrounding unit of work.
+
+    Yields:
+        An open AsyncSession for the current request.
+    """
+    async with async_session_maker() as session:
         yield session
 
 
-async def get_current_token_payload(
-    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
-) -> dict[str, Any]:
-    """Validate the bearer token and return its decoded claims."""
-    if credentials is None:
-        raise AuthenticationError("Missing or invalid Authorization header")
-    return decode_token(credentials.credentials)
+async def get_user_repository(
+    session: AsyncSession = Depends(get_session),
+) -> UserRepository:
+    """Provide a request-scoped UserRepository.
+
+    Args:
+        session: The request-scoped async database session.
+
+    Returns:
+        A repository bound to the User model.
+    """
+    return UserRepository(
+        session=session,
+        model=User,
+    )
 
 
-def get_user_repository(session: AsyncSession = Depends(get_db)) -> UserRepository:
-    """Build a request-scoped user repository."""
-    return UserRepository(session, User)
-
-
-def get_user_service(
+async def get_auth_service(
     repository: UserRepository = Depends(get_user_repository),
-) -> UserService:
-    """Build a request-scoped user service."""
-    return UserService(repository)
+) -> AuthService:
+    """Provide a request-scoped AuthService.
+
+    Args:
+        repository: Injected UserRepository.
+
+    Returns:
+        AuthService instance.
+    """
+    return AuthService(repository)
 
 
 async def get_current_user(
-    payload: dict[str, Any] = Depends(get_current_token_payload),
-    service: UserService = Depends(get_user_service),
+    token: str = Depends(oauth2_scheme),
+    repository: UserRepository = Depends(get_user_repository),
 ) -> User:
-    """Resolve the authenticated account from the bearer token subject."""
-    subject = payload.get("sub")
-    if subject is None:
-        raise AuthenticationError("Token is missing a subject")
+    """Resolve authenticated user from bearer token.
+
+    Args:
+        token:
+            JWT bearer token.
+
+        repository:
+            User repository dependency.
+
+    Returns:
+        Authenticated User instance.
+
+    Raises:
+        InvalidTokenError:
+            If token subject is invalid or user does not exist.
+    """
+    payload = verify_token(token)
 
     try:
-        user_id = uuid.UUID(str(subject))
-    except ValueError as exc:
-        raise AuthenticationError("Token subject is not a valid user id") from exc
+        subject = uuid.UUID(payload["sub"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise InvalidTokenError() from exc
 
-    user = await service.repository.get(user_id)
+    user = await repository.get(subject)
+
     if user is None:
-        raise AuthenticationError("Account no longer exists")
+        raise InvalidTokenError()
+
     return user

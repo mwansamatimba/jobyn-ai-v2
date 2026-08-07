@@ -43,7 +43,7 @@ from uuid import UUID
 import jwt
 from fastapi import HTTPException, status
 
-from backend.core.config.settings import settings
+from backend.core.config import settings
 
 __all__ = [
     "JWTError",

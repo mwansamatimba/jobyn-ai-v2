@@ -1,11 +1,6 @@
-"""Application configuration.
+"""Application configuration."""
 
-Settings are loaded from environment variables and an optional ``.env`` file.
-This module is a leaf node in the dependency graph: nothing in the application
-imports it transitively back, which is what prevents circular imports at the
-core level.
-"""
-
+import sys
 from functools import lru_cache
 from typing import Literal
 
@@ -14,13 +9,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """Runtime configuration for the Jobyn AI API.
-
-    Every value can be overridden through an environment variable or a ``.env``
-    file placed at the repository root. Prefixing the fields with ``APP_`` etc.
-    is intentionally avoided: pydantic-settings reads fields case-insensitively
-    and matches environment variables by field name.
-    """
+    """Runtime application settings."""
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -31,9 +20,21 @@ class Settings(BaseSettings):
 
     APP_NAME: str = "Jobyn AI"
     APP_VERSION: str = "2.0.0"
-    ENVIRONMENT: Literal["development", "test", "staging", "production"] = "development"
+
+    ENVIRONMENT: Literal[
+        "development",
+        "test",
+        "staging",
+        "production",
+    ] = "development"
+
     DEBUG: bool = False
     LOG_LEVEL: str = "INFO"
+
+    # Gemini
+    GEMINI_API_KEY: str | None = None
+    GEMINI_MODEL: str = "gemini-2.0-flash"
+    GEMINI_TIMEOUT_SECONDS: float = 60.0
 
     API_V1_PREFIX: str = "/api/v1"
 
@@ -47,28 +48,49 @@ class Settings(BaseSettings):
 
     CELERY_BROKER_URL: str = "redis://localhost:6379/1"
     CELERY_RESULT_BACKEND: str = "redis://localhost:6379/2"
+
     CELERY_TASK_TRACK_STARTED: bool = True
     CELERY_WORKER_CONCURRENCY: int = 4
 
-    BACKEND_CORS_ORIGINS: list[str] = ["http://localhost:8000"]
+    BACKEND_CORS_ORIGINS: list[str] = [
+        "http://localhost:8000"
+    ]
 
-    @field_validator("BACKEND_CORS_ORIGINS", mode="before")
+    @field_validator(
+        "BACKEND_CORS_ORIGINS",
+        mode="before",
+    )
     @classmethod
-    def _split_cors_origins(cls, value: object) -> object:
+    def split_cors_origins(cls, value):
+
         if isinstance(value, str):
-            return [origin.strip() for origin in value.split(",") if origin.strip()]
+            return [
+                item.strip()
+                for item in value.split(",")
+                if item.strip()
+            ]
+
         return value
 
+
     @property
-    def is_production(self) -> bool:
+    def is_production(self):
         return self.ENVIRONMENT == "production"
 
 
 @lru_cache
 def get_settings() -> Settings:
-    """Return the cached settings instance.
 
-    The cache is invalidated in tests by clearing ``get_settings.cache_clear()``
-    or by setting environment variables before the first import of this module.
-    """
     return Settings()
+
+
+settings = get_settings()
+
+# --- Backward-compatibility shim --------------------------------------------
+# This module replaces the old `backend/core/config/` package (which had a
+# `settings.py` submodule). Anything still doing
+# `from backend.core.config.settings import settings` would otherwise fail
+# with "ModuleNotFoundError: ... 'backend.core.config' is not a package".
+# Registering this module under the old dotted path lets those imports keep
+# resolving without having to touch every call site right now.
+sys.modules[f"{__name__}.settings"] = sys.modules[__name__]

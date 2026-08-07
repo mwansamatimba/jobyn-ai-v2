@@ -1,0 +1,12 @@
+- [x] Database
+- [ ] Authentication
+- [ ] Resume Upload
+- [ ] Resume Parser
+- [ ] AI Profile Builder
+- [ ] Job Matching
+- [ ] ATS Analysis
+- [ ] Cover Letter
+- [ ] Interview Coach
+- [ ] Career Coach
+- [ ] Auto Apply
+- [ ] Admin Dashboard

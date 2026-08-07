@@ -5,9 +5,11 @@ registration, credential-based authentication and access-token issuance.
 
 The service depends only on the :class:`UserRepository` for persistence and on
 the framework-agnostic helpers in :mod:`backend.auth.password` and
-:mod:`backend.auth.jwt` for password hashing and token generation. It never
-commits transactions: repositories ``flush`` so the surrounding unit of work
-keeps control of the transaction boundary.
+:mod:`backend.auth.jwt` for password hashing and token generation.
+
+Transaction ownership follows the :class:`~backend.services.base.BaseService`
+pattern: repositories flush, and the service commits or rolls back at the end
+of each use case so routes stay free of session lifecycle concerns.
 """
 
 from __future__ import annotations
@@ -24,6 +26,7 @@ from backend.models.user import User
 from backend.repositories.user import UserRepository
 from backend.schemas.auth import TokenResponse
 from backend.schemas.user import UserCreate, UserRead
+from backend.services.base import BaseService
 
 # Precomputed hash of an arbitrary password. Verified against when no account
 # matches a login attempt so that failed lookups cost roughly the same CPU time
@@ -77,7 +80,7 @@ def _normalize_email(email: str) -> str:
     return email.strip().lower()
 
 
-class AuthService:
+class AuthService(BaseService[UserRepository]):
     """Application service implementing the authentication use cases.
 
     Args:
@@ -85,20 +88,18 @@ class AuthService:
     """
 
     def __init__(self, user_repository: UserRepository) -> None:
+        super().__init__(user_repository)
         self.user_repository = user_repository
 
     async def register_user(self, data: UserCreate) -> UserRead:
-        """Create a new user account.
+        """Create a new user account and commit the transaction.
 
         Behavior:
             1. Rejects the request when an account with the same (normalized)
                email already exists.
             2. Hashes the plain-text password via :func:`backend.auth.password.hash_password`.
-            3. Persists the user through :class:`UserRepository` and returns its
-               public representation.
-
-        The service does not commit; the caller's unit of work owns the
-        transaction boundary.
+            3. Persists the user through :class:`UserRepository`, commits, and
+               returns its public representation.
 
         Args:
             data: Validated registration payload.
@@ -126,7 +127,9 @@ class AuthService:
                 is_active=True,
                 is_verified=False,
             )
+            await self.commit()
         except IntegrityError as exc:
+            await self.rollback()
             raise EmailAlreadyRegisteredError(email) from exc
 
         # Materialize server-side defaults (e.g. created_at) so the returned

@@ -10,7 +10,7 @@ so the unit-of-work boundary (a service method or an endpoint) decides when to
 commit via ``await session.commit()`` or ``await session.rollback()``.
 """
 
-from collections.abc import Mapping
+from collections.abc import AsyncGenerator, Mapping
 from typing import Any
 
 from backend.core.config import get_settings
@@ -52,3 +52,19 @@ async_session_factory: async_sessionmaker[AsyncSession] = async_sessionmaker(
     expire_on_commit=False,
     autoflush=False,
 )
+
+# Alias used by deps.py
+async_session_maker = async_session_factory
+
+
+async def get_session() -> AsyncGenerator[AsyncSession, None]:
+    """Yield a request-scoped async database session.
+
+    Only the session lifecycle is managed here; committing and rolling back
+    are left to the surrounding unit of work.
+
+    Yields:
+        An open AsyncSession for the current request.
+    """
+    async with async_session_factory() as session:
+        yield session
