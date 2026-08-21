@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jobyn AI — MVP Demo</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh}
+#app{display:flex;flex-direction:column;min-height:100vh}
+header{background:#1e293b;border-bottom:1px solid #334155;padding:12px 24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.logo{font-size:20px;font-weight:700;color:#38bdf8;letter-spacing:-.5px}.logo span{color:#818cf8}
+nav{display:flex;gap:4px;flex-wrap:wrap}
+nav button{background:none;border:none;color:#94a3b8;padding:7px 13px;border-radius:6px;cursor:pointer;font-size:13px;transition:all .15s}
+nav button:hover{background:#334155;color:#e2e8f0}
+nav button.active{background:#334155;color:#38bdf8;font-weight:600}
+#user-info{display:flex;align-items:center;gap:10px;font-size:13px;color:#64748b}
+#logout-btn{background:#334155;border:none;color:#f87171;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px}
+#logout-btn:hover{background:#450a0a}
+main{flex:1;padding:24px;max-width:1100px;width:100%;margin:0 auto}
+.section{display:none}.section.active{display:block}
+h2{font-size:22px;font-weight:700;color:#f1f5f9;margin-bottom:20px}
+h3{font-size:16px;font-weight:600;color:#cbd5e1;margin-bottom:12px}
+.card{background:#1e293b;border:1px solid #334155;border-radius:10px;padding:20px;margin-bottom:16px}
+.card-title{font-size:15px;font-weight:600;color:#f1f5f9;margin-bottom:6px}
+.card-sub{font-size:13px;color:#64748b;margin-bottom:10px}
+label{display:block;font-size:13px;color:#94a3b8;margin-bottom:5px;font-weight:500}
+input[type=text],input[type=email],input[type=password],textarea,select{width:100%;background:#0f172a;border:1px solid #334155;color:#e2e8f0;padding:9px 12px;border-radius:7px;font-size:14px;margin-bottom:14px;outline:none}
+input:focus,textarea:focus,select:focus{border-color:#38bdf8}
+textarea{resize:vertical;min-height:90px}
+button.btn{background:#38bdf8;color:#0f172a;border:none;padding:9px 18px;border-radius:7px;font-weight:600;cursor:pointer;font-size:14px;transition:background .15s}
+button.btn:hover{background:#7dd3fc}
+button.btn:disabled{opacity:.5;cursor:not-allowed}
+button.btn-sm{padding:6px 12px;font-size:12px}
+button.btn-outline{background:transparent;border:1px solid #334155;color:#94a3b8}
+button.btn-outline:hover{border-color:#38bdf8;color:#38bdf8}
+.msg{padding:10px 14px;border-radius:7px;font-size:13px;margin-bottom:12px;display:none}
+.msg.ok{background:#052e16;border:1px solid #16a34a;color:#86efac;display:block}
+.msg.err{background:#450a0a;border:1px solid #b91c1c;color:#fca5a5;display:block}
+.msg.info{background:#0c1a2e;border:1px solid #1e40af;color:#93c5fd;display:block}
+.tag{display:inline-block;background:#0f172a;border:1px solid #334155;color:#94a3b8;padding:2px 8px;border-radius:20px;font-size:11px;margin:2px}
+.tag.green{border-color:#16a34a;color:#86efac}
+.tag.blue{border-color:#1e40af;color:#93c5fd}
+.tag.yellow{border-color:#ca8a04;color:#fde047}
+.score-bar{background:#334155;border-radius:999px;height:8px;margin:6px 0 12px}
+.score-fill{background:linear-gradient(90deg,#38bdf8,#818cf8);height:100%;border-radius:999px;transition:width .5s}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:640px){.grid-2{grid-template-columns:1fr}}
+.jobs-list{display:grid;gap:12px}
+.job-card{background:#1e293b;border:1px solid #334155;border-radius:10px;padding:16px;cursor:pointer;transition:border-color .15s}
+.job-card:hover,.job-card.selected{border-color:#38bdf8}
+.job-card .jt{font-size:15px;font-weight:600;color:#f1f5f9}
+.job-card .jc{font-size:13px;color:#38bdf8;margin:3px 0}
+.job-card .jl{font-size:12px;color:#64748b}
+.job-card .tags{margin-top:8px}
+.spinner{display:inline-block;width:16px;height:16px;border:2px solid #334155;border-top-color:#38bdf8;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:6px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.cover-letter{background:#0f172a;border:1px solid #334155;border-radius:7px;padding:14px;font-size:13px;line-height:1.7;white-space:pre-wrap;color:#cbd5e1;margin-bottom:10px}
+.q-card{background:#0f172a;border:1px solid #334155;border-radius:8px;padding:14px;margin-bottom:10px}
+.q-card .qt{font-size:14px;color:#f1f5f9;margin-bottom:6px}
+.q-card .qm{font-size:11px;color:#64748b;margin-bottom:8px}
+.q-card ul{padding-left:18px;font-size:13px;color:#94a3b8;line-height:1.6}
+.app-row{display:flex;align-items:center;gap:12px;padding:12px 16px;background:#1e293b;border:1px solid #334155;border-radius:8px;margin-bottom:8px;flex-wrap:wrap}
+.app-row .at{font-size:14px;font-weight:600;flex:1;color:#f1f5f9}
+.sbadge{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+.s-draft{background:#1e293b;color:#64748b;border:1px solid #334155}
+.s-applied{background:#0c1a2e;color:#93c5fd;border:1px solid #1e40af}
+.s-under_review{background:#1a1205;color:#fde047;border:1px solid #ca8a04}
+.s-interviewing{background:#0c1f1a;color:#86efac;border:1px solid #16a34a}
+.s-offered{background:#0c1a0c;color:#4ade80;border:1px solid #15803d}
+.s-rejected{background:#450a0a;color:#fca5a5;border:1px solid #b91c1c}
+.s-withdrawn{background:#1e1b1b;color:#78716c;border:1px solid #44403c}
+#login-screen{max-width:400px;margin:80px auto}
+</style>
+</head>
+<body>
+<div id="app">
+<!-- LOGIN -->
+<div id="login-screen">
+  <div style="text-align:center;margin-bottom:28px">
+    <div class="logo" style="font-size:28px;margin-bottom:8px">Jobyn <span>AI</span></div>
+    <div style="color:#64748b;font-size:14px">AI-Powered Career Intelligence</div>
+  </div>
+  <div class="card">
+    <h3 style="margin-bottom:16px">Sign In</h3>
+    <div id="login-msg"></div>
+    <label>Email</label><input type="email" id="login-email" placeholder="you@example.com">
+    <label>Password</label><input type="password" id="login-password" placeholder="••••••••">
+    <button class="btn" style="width:100%" onclick="doLogin()">Sign In</button>
+    <div style="text-align:center;margin-top:12px;font-size:12px;color:#475569">
+      No account? <a href="#" onclick="showRegister()" style="color:#38bdf8">Create one</a>
+    </div>
+  </div>
+  <div id="register-box" style="display:none" class="card">
+    <h3 style="margin-bottom:16px">Create Account</h3>
+    <div id="reg-msg"></div>
+    <label>Full Name</label><input type="text" id="reg-name" placeholder="Jane Smith">
+    <label>Email</label><input type="email" id="reg-email" placeholder="you@example.com">
+    <label>Password (min 8 chars)</label><input type="password" id="reg-password" placeholder="••••••••">
+    <button class="btn" style="width:100%" onclick="doRegister()">Create Account</button>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="main-app" style="display:none;flex-direction:column;flex:1">
+  <header>
+    <div class="logo">Jobyn <span>AI</span></div>
+    <nav>
+      <button class="active" onclick="showTab('dashboard')">Dashboard</button>
+      <button onclick="showTab('resume')">Resume</button>
+      <button onclick="showTab('jobs')">Jobs</button>
+      <button onclick="showTab('career')">Career Navigator</button>
+      <button onclick="showTab('copilot')">Copilot</button>
+      <button onclick="showTab('applications')">Applications</button>
+      <button onclick="showTab('interview')">Interview Prep</button>
+    </nav>
+    <div id="user-info">
+      <span id="user-email-display"></span>
+      <button id="logout-btn" onclick="doLogout()">Sign Out</button>
+    </div>
+  </header>
+  <main>
+    <!-- DASHBOARD -->
+    <div id="tab-dashboard" class="section active">
+      <h2>Welcome to Jobyn AI</h2>
+      <div class="grid-2">
+        <div class="card" style="cursor:pointer" onclick="showTab('resume')">
+          <div class="card-title">📄 Resume</div>
+          <div class="card-sub">Upload your CV to power all AI features</div>
+          <button class="btn btn-sm">Upload Resume →</button>
+        </div>
+        <div class="card" style="cursor:pointer" onclick="showTab('jobs')">
+          <div class="card-title">🔍 Browse Jobs</div>
+          <div class="card-sub">Explore real remote job listings</div>
+          <button class="btn btn-sm">View Jobs →</button>
+        </div>
+        <div class="card" style="cursor:pointer" onclick="runMatch()">
+          <div class="card-title">⚡ AI Job Matching</div>
+          <div class="card-sub">Get AI-ranked jobs based on your profile</div>
+          <button class="btn btn-sm">Find Jobs For Me →</button>
+        </div>
+        <div class="card" style="cursor:pointer" onclick="showTab('career')">
+          <div class="card-title">🧭 Career Navigator</div>
+          <div class="card-sub">Understand your career path and skill gaps</div>
+          <button class="btn btn-sm">Analyse Career →</button>
+        </div>
+      </div>
+      <div id="dash-match-result"></div>
+    </div>
+
+    <!-- RESUME -->
+    <div id="tab-resume" class="section">
+      <h2>Resume</h2>
+      <div class="card">
+        <h3>Upload your CV</h3>
+        <div class="card-sub">PDF or DOCX · Max 10 MB</div>
+        <div id="resume-msg"></div>
+        <input type="file" id="resume-file" accept=".pdf,.docx" style="margin-bottom:14px;color:#94a3b8">
+        <button class="btn" onclick="uploadResume()">Upload &amp; Parse</button>
+      </div>
+      <div id="profile-card" style="display:none" class="card">
+        <h3>Your Candidate Profile</h3>
+        <div id="profile-content"></div>
+      </div>
+    </div>
+
+    <!-- JOBS -->
+    <div id="tab-jobs" class="section">
+      <h2>Job Listings</h2>
+      <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap">
+        <input type="text" id="job-search" placeholder="Filter by title or company…" style="flex:1;margin:0" oninput="filterJobs()">
+        <button class="btn" onclick="loadJobs()">Refresh</button>
+        <button class="btn btn-outline" onclick="runMatch()">⚡ Match My Profile</button>
+      </div>
+      <div id="jobs-msg"></div>
+      <div id="jobs-list" class="jobs-list"><div class="msg info">Loading jobs…</div></div>
+    </div>
+    <!-- CAREER NAVIGATOR -->
+    <div id="tab-career" class="section">
+      <h2>Career Navigator</h2>
+      <div class="card">
+        <label>Target Role (optional)</label>
+        <input type="text" id="career-role" placeholder="e.g. Senior Backend Engineer">
+        <div id="career-msg"></div>
+        <button class="btn" onclick="analyseCareer()">Analyse My Career</button>
+      </div>
+      <div id="career-result"></div>
+    </div>
+
+    <!-- APPLICATION COPILOT -->
+    <div id="tab-copilot" class="section">
+      <h2>Application Copilot</h2>
+      <div class="card">
+        <h3>Select a Job</h3>
+        <select id="copilot-job-select" style="margin-bottom:10px"><option value="">— select a job —</option></select>
+        <label>Additional Context (optional)</label>
+        <textarea id="copilot-context" placeholder="e.g. I led a migration from Flask to FastAPI at my last role."></textarea>
+        <div id="copilot-msg"></div>
+        <button class="btn" onclick="generateCopilot()">Generate Cover Letter</button>
+      </div>
+      <div id="copilot-result"></div>
+    </div>
+
+    <!-- APPLICATIONS -->
+    <div id="tab-applications" class="section">
+      <h2>My Applications</h2>
+      <div class="card">
+        <h3>Apply to a Job</h3>
+        <select id="apply-job-select" style="margin-bottom:10px"><option value="">— select a job —</option></select>
+        <textarea id="apply-cover" placeholder="Cover letter (optional — paste from Copilot)"></textarea>
+        <div id="apply-msg"></div>
+        <button class="btn" onclick="createApplication()">Submit Application</button>
+      </div>
+      <div id="applications-list"></div>
+    </div>
+
+    <!-- INTERVIEW PREP -->
+    <div id="tab-interview" class="section">
+      <h2>Interview Preparation</h2>
+      <div class="card">
+        <h3>Select Application</h3>
+        <div class="card-sub">Choose an application to prepare for its interview</div>
+        <select id="interview-app-select" style="margin-bottom:10px"><option value="">— select an application —</option></select>
+        <div id="interview-msg"></div>
+        <button class="btn" onclick="generateInterviewPrep()">Prepare for Interview</button>
+      </div>
+      <div id="interview-result"></div>
+    </div>
+
+  </main>
+</div><!-- /main-app -->
+</div><!-- /app -->
+<script>
+// ── State ────────────────────────────────────────────────────────
+let token = localStorage.getItem('jobyn_token') || null;
+let userEmail = localStorage.getItem('jobyn_email') || '';
+let allJobs = [];
+let selectedJobId = null;
+let myApplications = [];
+
+// ── Bootstrap ────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => { if (token) initApp(); });
+
+function initApp() {
+  document.getElementById('login-screen').style.display = 'none';
+  const ma = document.getElementById('main-app');
+  ma.style.display = 'flex';
+  document.getElementById('user-email-display').textContent = userEmail;
+  loadJobs();
+  loadApplications();
+}
+
+// ── Utilities ────────────────────────────────────────────────────
+function esc(s) { const d = document.createElement('div'); d.textContent = s||''; return d.innerHTML; }
+function showMsg(el, type, html) { el.className = 'msg ' + type; el.innerHTML = html; }
+function spin() { return '<span class="spinner"></span>'; }
+function scoreBar(n) {
+  return `<div class="score-bar"><div class="score-fill" style="width:${n}%"></div></div>
+          <div style="font-size:12px;color:#64748b">${n}/100</div>`;
+}
+function tags(arr, cls='') { return (arr||[]).map(t=>`<span class="tag ${cls}">${esc(t)}</span>`).join(''); }
+
+async function api(path, method='GET', body=null, auth=true) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (auth && token) opts.headers['Authorization'] = `Bearer ${token}`;
+  if (body) opts.body = JSON.stringify(body);
+  try {
+    const r = await fetch(path, opts);
+    const data = await r.json().catch(() => ({}));
+    return { ok: r.ok, status: r.status, data };
+  } catch(e) { return { ok: false, status: 0, data: { detail: 'Network error.' } }; }
+}
+
+function showTab(name) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  document.querySelectorAll('nav button').forEach(b => {
+    if (b.textContent.toLowerCase().includes(name.substring(0,4))) b.classList.add('active');
+  });
+  if (name === 'applications') loadApplications();
+}
+</script>
+<script>
+// ── Auth ─────────────────────────────────────────────────────────
+function showRegister() {
+  const rb = document.getElementById('register-box');
+  rb.style.display = rb.style.display === 'none' ? 'block' : 'none';
+}
+async function doLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  const msg = document.getElementById('login-msg');
+  if (!email || !password) { showMsg(msg,'err','Please enter email and password.'); return; }
+  showMsg(msg,'info',spin()+'Signing in…');
+  const r = await api('/api/v1/auth/login','POST',{email,password},false);
+  if (r.ok) {
+    token = r.data.access_token; userEmail = email;
+    localStorage.setItem('jobyn_token', token);
+    localStorage.setItem('jobyn_email', email);
+    initApp();
+  } else { showMsg(msg,'err', r.data?.detail || 'Login failed.'); }
+}
+async function doRegister() {
+  const full_name = document.getElementById('reg-name').value.trim();
+  const email = document.getElementById('reg-email').value.trim();
+  const password = document.getElementById('reg-password').value;
+  const msg = document.getElementById('reg-msg');
+  if (!email || !password) { showMsg(msg,'err','Email and password required.'); return; }
+  showMsg(msg,'info',spin()+'Creating account…');
+  const r = await api('/api/v1/auth/register','POST',{email,password,full_name},false);
+  if (r.ok) {
+    showMsg(msg,'ok','Account created! Signing you in…');
+    document.getElementById('login-email').value = email;
+    document.getElementById('login-password').value = password;
+    await doLogin();
+  } else { showMsg(msg,'err', r.data?.detail || 'Registration failed.'); }
+}
+function doLogout() {
+  token = null; userEmail = '';
+  localStorage.removeItem('jobyn_token');
+  localStorage.removeItem('jobyn_email');
+  location.reload();
+}
+
+// ── Resume ───────────────────────────────────────────────────────
+async function uploadResume() {
+  const file = document.getElementById('resume-file').files[0];
+  const msg = document.getElementById('resume-msg');
+  if (!file) { showMsg(msg,'err','Please select a file.'); return; }
+  showMsg(msg,'info',spin()+'Uploading and parsing — this may take a moment…');
+  const fd = new FormData(); fd.append('file', file);
+  try {
+    const r = await fetch('/api/v1/resume/upload',{method:'POST',headers:{Authorization:`Bearer ${token}`},body:fd});
+    const data = await r.json();
+    if (r.ok) { showMsg(msg,'ok','Resume uploaded and parsed!'); showProfile(data.parsed_data); }
+    else { showMsg(msg,'err', data.detail || 'Upload failed.'); }
+  } catch(e) { showMsg(msg,'err','Network error during upload.'); }
+}
+function showProfile(p) {
+  if (!p) return;
+  document.getElementById('profile-content').innerHTML = `
+    <div class="grid-2" style="margin-bottom:12px">
+      <div><label>Name</label><div style="color:#f1f5f9">${esc(p.name||'—')}</div></div>
+      <div><label>Level</label><div style="color:#f1f5f9">${esc(p.career_level||'—')}</div></div>
+      <div><label>Experience</label><div style="color:#f1f5f9">${esc(p.years_experience||'—')}</div></div>
+      <div><label>Industries</label><div style="color:#f1f5f9">${esc((p.industries||[]).join(', ')||'—')}</div></div>
+    </div>
+    <label>Skills</label><div style="margin-bottom:10px">${tags(p.skills,'blue')}</div>
+    <label>Strengths</label><div style="margin-bottom:10px">${tags(p.strengths,'green')}</div>
+    <label>Skill Gaps</label><div>${tags(p.skill_gaps,'yellow')}</div>`;
+  document.getElementById('profile-card').style.display = 'block';
+}
+</script>
+<script>
+// ── Jobs ─────────────────────────────────────────────────────────
+async function loadJobs() {
+  document.getElementById('jobs-list').innerHTML = `<div class="msg info">${spin()}Loading jobs…</div>`;
+  const r = await api('/api/v1/jobs?limit=100');
+  if (r.ok) {
+    allJobs = r.data.items || [];
+    renderJobs(allJobs);
+    populateJobSelects(allJobs);
+  } else {
+    document.getElementById('jobs-list').innerHTML = '<div class="msg err">Could not load jobs. Make sure the server is running.</div>';
+  }
+}
+function renderJobs(jobs) {
+  const el = document.getElementById('jobs-list');
+  if (!jobs.length) { el.innerHTML = '<div class="msg info">No jobs found.</div>'; return; }
+  el.innerHTML = jobs.map(j => `
+    <div class="job-card${selectedJobId===j.id?' selected':''}" onclick="selectJob('${j.id}',this)">
+      <div class="jt">${esc(j.title)}</div>
+      <div class="jc">${esc(j.company_name)}</div>
+      <div class="jl">${esc(j.location||'Remote')}</div>
+      <div class="tags">
+        ${j.employment_type?`<span class="tag">${esc(j.employment_type)}</span>`:''}
+        ${j.experience_level?`<span class="tag blue">${esc(j.experience_level)}</span>`:''}
+        ${j.location_type?`<span class="tag green">${esc(j.location_type)}</span>`:''}
+        ${j.external_url?`<a href="${esc(j.external_url)}" target="_blank" onclick="event.stopPropagation()" style="font-size:11px;color:#38bdf8;margin:2px 4px;text-decoration:none">View ↗</a>`:''}
+      </div>
+    </div>`).join('');
+}
+function filterJobs() {
+  const q = document.getElementById('job-search').value.toLowerCase();
+  renderJobs(allJobs.filter(j=>(j.title||'').toLowerCase().includes(q)||(j.company_name||'').toLowerCase().includes(q)));
+}
+function selectJob(id, el) {
+  selectedJobId = id;
+  document.querySelectorAll('.job-card').forEach(c=>c.classList.remove('selected'));
+  el.classList.add('selected');
+}
+function populateJobSelects(jobs) {
+  ['copilot-job-select','apply-job-select'].forEach(id=>{
+    const sel = document.getElementById(id);
+    const prev = sel.value;
+    sel.innerHTML = '<option value="">— select a job —</option>' +
+      jobs.map(j=>`<option value="${j.id}">${esc(j.title)} — ${esc(j.company_name)}</option>`).join('');
+    if (prev) sel.value = prev;
+  });
+}
+
+// POST /api/v1/jobs/match
+async function runMatch() {
+  const el = document.getElementById('dash-match-result');
+  const jobsMsg = document.getElementById('jobs-msg');
+  el.innerHTML = `<div class="msg info">${spin()}Running AI job matching — this may take up to 30 seconds…</div>`;
+  if (jobsMsg) showMsg(jobsMsg,'info',spin()+'Matching your profile against available jobs…');
+  showTab('dashboard');
+  const r = await api('/api/v1/jobs/match','POST');
+  if (!r.ok) {
+    const detail = r.data?.detail || 'Matching failed. Make sure you have uploaded a resume.';
+    el.innerHTML = `<div class="msg err">${esc(detail)}</div>`;
+    return;
+  }
+  const matches = r.data.top_matches || [];
+  if (!matches.length) { el.innerHTML = '<div class="msg info">No matches returned. Try uploading or updating your resume.</div>'; return; }
+  el.innerHTML = `<h3 style="margin-bottom:12px">⚡ AI Job Matches</h3>
+    <div style="font-size:13px;color:#64748b;margin-bottom:16px">${esc(r.data.overall_match_summary||'')}</div>` +
+    matches.map(m=>`
+    <div class="card" style="margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+        <div>
+          <div style="font-size:15px;font-weight:600;color:#f1f5f9">${esc(m.job_title)}</div>
+          <div style="font-size:13px;color:#38bdf8">${esc(m.company)}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:22px;font-weight:700;color:#38bdf8">${m.match_score}<span style="font-size:13px;color:#64748b">%</span></div>
+          ${scoreBar(m.match_score)}
+        </div>
+      </div>
+      <div style="font-size:13px;color:#94a3b8;margin-bottom:10px">${esc(m.reason)}</div>
+      <label>Matching Skills</label><div style="margin-bottom:8px">${tags(m.matching_skills,'green')}</div>
+      <label>Missing Skills</label><div>${tags(m.missing_skills,'yellow')}</div>
+    </div>`).join('') +
+    (r.data.recommended_next_actions?.length ? `
+    <div class="card"><h3>Next Actions</h3>
+      <ul style="padding-left:18px;font-size:13px;color:#94a3b8;line-height:1.8">
+        ${(r.data.recommended_next_actions||[]).map(a=>`<li>${esc(a)}</li>`).join('')}
+      </ul></div>` : '');
+}
+</script>
+<script>
+// ── Career Navigator ─────────────────────────────────────────────
+// POST /api/v1/career/analyze  body: {target_role?}
+// Response: {career_direction, recommended_roles, career_path, skill_priorities,
+//            certification_recommendations, job_search_strategy, career_advice}
+async function analyseCareer() {
+  const msg = document.getElementById('career-msg');
+  const target_role = document.getElementById('career-role').value.trim() || null;
+  showMsg(msg,'info',spin()+'Analysing your career — this may take a moment…');
+  const r = await api('/api/v1/career/analyze','POST',{target_role});
+  if (!r.ok) { showMsg(msg,'err', r.data?.detail || 'Analysis failed. Upload a resume first.'); return; }
+  msg.className = 'msg'; msg.innerHTML = '';
+  const d = r.data;
+  document.getElementById('career-result').innerHTML = `
+    <div class="card">
+      <h3>Career Direction</h3>
+      <div style="font-size:14px;color:#e2e8f0;line-height:1.7">${esc(d.career_direction)}</div>
+    </div>
+    <div class="grid-2">
+      <div class="card">
+        <h3>Recommended Roles</h3>
+        ${(d.recommended_roles||[]).map(r=>`<div style="padding:5px 0;border-bottom:1px solid #334155;font-size:13px">${esc(r)}</div>`).join('')||'<div class="card-sub">None returned.</div>'}
+      </div>
+      <div class="card">
+        <h3>Skill Priorities</h3>
+        ${tags(d.skill_priorities,'blue')||'<div class="card-sub">None returned.</div>'}
+      </div>
+    </div>
+    <div class="card">
+      <h3>Career Path</h3>
+      ${(d.career_path||[]).map((s,i)=>`
+        <div style="margin-bottom:14px;padding:12px;background:#0f172a;border-radius:8px;border-left:3px solid #38bdf8">
+          <div style="font-size:13px;font-weight:600;color:#38bdf8;margin-bottom:4px">${esc(s.stage)} <span style="color:#64748b;font-weight:400">· ${esc(s.timeline)}</span></div>
+          <ul style="padding-left:18px;font-size:13px;color:#94a3b8;line-height:1.7">
+            ${(s.actions||[]).map(a=>`<li>${esc(a)}</li>`).join('')}
+          </ul>
+        </div>`).join('')||'<div class="card-sub">No path returned.</div>'}
+    </div>
+    <div class="grid-2">
+      <div class="card">
+        <h3>Certifications</h3>
+        ${(d.certification_recommendations||[]).map(c=>`<div style="font-size:13px;padding:4px 0;border-bottom:1px solid #334155">${esc(c)}</div>`).join('')||'<div class="card-sub">None recommended.</div>'}
+      </div>
+      <div class="card">
+        <h3>Job Search Strategy</h3>
+        <ul style="padding-left:18px;font-size:13px;color:#94a3b8;line-height:1.7">
+          ${(d.job_search_strategy||[]).map(s=>`<li>${esc(s)}</li>`).join('')||'<li>—</li>'}
+        </ul>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Career Advice</h3>
+      <div style="font-size:14px;color:#e2e8f0;line-height:1.7;font-style:italic">"${esc(d.career_advice)}"</div>
+    </div>`;
+}
+</script>
+<script>
+// ── Application Copilot ──────────────────────────────────────────
+// POST /api/v1/application-copilot/generate  body: {job_id, additional_context?}
+// Response: {cover_letter, key_selling_points, matched_requirements,
+//            addressed_skill_gaps, application_tips, job_title, company}
+async function generateCopilot() {
+  const job_id = document.getElementById('copilot-job-select').value;
+  const additional_context = document.getElementById('copilot-context').value.trim() || null;
+  const msg = document.getElementById('copilot-msg');
+  if (!job_id) { showMsg(msg,'err','Please select a job first.'); return; }
+  showMsg(msg,'info',spin()+'Generating tailored cover letter — this may take a moment…');
+  const r = await api('/api/v1/application-copilot/generate','POST',{job_id,additional_context});
+  if (!r.ok) { showMsg(msg,'err', r.data?.detail || 'Generation failed. Make sure you have a parsed resume.'); return; }
+  msg.className='msg'; msg.innerHTML='';
+  const d = r.data;
+  document.getElementById('copilot-result').innerHTML = `
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <h3 style="margin:0">${esc(d.job_title)} — ${esc(d.company)}</h3>
+        <button class="btn btn-sm btn-outline" onclick="copyCover()">📋 Copy Letter</button>
+      </div>
+      <div class="cover-letter" id="cover-letter-text">${esc(d.cover_letter)}</div>
+    </div>
+    <div class="grid-2">
+      <div class="card">
+        <h3>Key Selling Points</h3>
+        <ul style="padding-left:18px;font-size:13px;color:#94a3b8;line-height:1.7">
+          ${(d.key_selling_points||[]).map(p=>`<li>${esc(p)}</li>`).join('')||'<li>—</li>'}
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Matched Requirements</h3>
+        <ul style="padding-left:18px;font-size:13px;color:#94a3b8;line-height:1.7">
+          ${(d.matched_requirements||[]).map(p=>`<li>${esc(p)}</li>`).join('')||'<li>—</li>'}
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Addressed Skill Gaps</h3>
+        <ul style="padding-left:18px;font-size:13px;color:#94a3b8;line-height:1.7">
+          ${(d.addressed_skill_gaps||[]).map(p=>`<li>${esc(p)}</li>`).join('')||'<li>None identified.</li>'}
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Application Tips</h3>
+        <ul style="padding-left:18px;font-size:13px;color:#94a3b8;line-height:1.7">
+          ${(d.application_tips||[]).map(p=>`<li>${esc(p)}</li>`).join('')||'<li>—</li>'}
+        </ul>
+      </div>
+    </div>
+    <div class="card" style="background:#052e16;border-color:#16a34a">
+      <div style="font-size:13px;color:#86efac">✓ Cover letter generated. Go to <strong>Applications</strong> tab to submit your application using this letter.</div>
+    </div>`;
+  // Pre-fill the apply cover textarea for convenience
+  document.getElementById('apply-cover').value = d.cover_letter;
+  const applyJobSel = document.getElementById('apply-job-select');
+  if (job_id) applyJobSel.value = job_id;
+}
+function copyCover() {
+  const el = document.getElementById('cover-letter-text');
+  if (!el) return;
+  navigator.clipboard.writeText(el.textContent).then(()=>alert('Cover letter copied to clipboard!')).catch(()=>{
+    const ta = document.createElement('textarea');
+    ta.value = el.textContent; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+    alert('Cover letter copied!');
+  });
+}
+</script>
+<script>
+// ── Applications ─────────────────────────────────────────────────
+// POST /api/v1/applications  body: {job_id, cover_letter?, notes?, status?}
+// GET  /api/v1/applications  → {items: [{id, job_id, status, cover_letter, created_at, ...}]}
+// PATCH /api/v1/applications/{id}  body: {status?}
+const STATUS_FLOW = ['draft','applied','under_review','interviewing','offered'];
+const STATUS_TERMINAL = ['offered','rejected','withdrawn'];
+
+async function createApplication() {
+  const job_id = document.getElementById('apply-job-select').value;
+  const cover_letter = document.getElementById('apply-cover').value.trim() || null;
+  const msg = document.getElementById('apply-msg');
+  if (!job_id) { showMsg(msg,'err','Please select a job.'); return; }
+  showMsg(msg,'info',spin()+'Submitting application…');
+  const r = await api('/api/v1/applications','POST',{job_id, cover_letter, status:'applied'});
+  if (r.ok) {
+    showMsg(msg,'ok','Application submitted successfully!');
+    document.getElementById('apply-cover').value = '';
+    loadApplications();
+  } else {
+    showMsg(msg,'err', r.data?.detail || 'Failed to create application.');
+  }
+}
+
+async function loadApplications() {
+  const el = document.getElementById('applications-list');
+  if (!el) return;
+  el.innerHTML = `<div class="msg info">${spin()}Loading applications…</div>`;
+  const r = await api('/api/v1/applications?limit=50');
+  if (!r.ok) { el.innerHTML='<div class="msg err">Could not load applications.</div>'; return; }
+  myApplications = r.data.items || [];
+  populateInterviewSelect(myApplications);
+  if (!myApplications.length) { el.innerHTML='<div class="msg info">No applications yet. Go to the Copilot tab to generate a cover letter, then apply.</div>'; return; }
+  el.innerHTML = '<h3 style="margin-bottom:12px">Your Applications</h3>' +
+    myApplications.map(a=>{
+      const jobTitle = (allJobs.find(j=>j.id===a.job_id)||{}).title || 'Job';
+      const company  = (allJobs.find(j=>j.id===a.job_id)||{}).company_name || '';
+      const nextStatus = nextAllowedStatus(a.status);
+      return `<div class="app-row">
+        <div class="at">${esc(jobTitle)}<br><span style="font-size:12px;color:#64748b">${esc(company)}</span></div>
+        <span class="sbadge s-${a.status}">${a.status.replace('_',' ')}</span>
+        ${nextStatus?`<button class="btn btn-sm" onclick="advanceStatus('${a.id}','${nextStatus}')">→ ${nextStatus.replace('_',' ')}</button>`:''}
+        <button class="btn btn-sm btn-outline" onclick="prepInterview('${a.id}')">🎤 Interview Prep</button>
+      </div>`;
+    }).join('');
+}
+
+function nextAllowedStatus(current) {
+  const idx = STATUS_FLOW.indexOf(current);
+  if (idx === -1 || STATUS_TERMINAL.includes(current)) return null;
+  return STATUS_FLOW[idx+1] || null;
+}
+
+async function advanceStatus(appId, newStatus) {
+  const r = await api(`/api/v1/applications/${appId}`,'PATCH',{status: newStatus});
+  if (r.ok) loadApplications();
+  else alert(r.data?.detail || 'Status update failed.');
+}
+
+function populateInterviewSelect(apps) {
+  const sel = document.getElementById('interview-app-select');
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">— select an application —</option>' +
+    apps.map(a=>{
+      const jobTitle = (allJobs.find(j=>j.id===a.job_id)||{}).title || a.job_id;
+      return `<option value="${a.id}">${esc(jobTitle)} (${a.status})</option>`;
+    }).join('');
+  if (prev) sel.value = prev;
+}
+
+function prepInterview(appId) {
+  document.getElementById('interview-app-select').value = appId;
+  showTab('interview');
+  generateInterviewPrep();
+}
+</script>
+<script>
+// ── Interview Preparation ────────────────────────────────────────
+// POST /api/v1/applications/{application_id}/interview-prep
+// Response: {application_id, job_id, target_role, readiness_score,
+//            interview_questions:[{question,category,difficulty,ideal_answer_points}],
+//            strength_areas, improvement_areas, preparation_plan, final_advice}
+async function generateInterviewPrep() {
+  const appId = document.getElementById('interview-app-select').value;
+  const msg = document.getElementById('interview-msg');
+  if (!appId) { showMsg(msg,'err','Please select an application.'); return; }
+  showMsg(msg,'info',spin()+'Generating interview preparation — this may take a moment…');
+  const r = await api(`/api/v1/applications/${appId}/interview-prep`,'POST');
+  if (!r.ok) { showMsg(msg,'err', r.data?.detail || 'Generation failed.'); return; }
+  msg.className='msg'; msg.innerHTML='';
+  const d = r.data;
+  document.getElementById('interview-result').innerHTML = `
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div>
+          <h3>${esc(d.target_role)}</h3>
+          <div style="font-size:13px;color:#64748b">Readiness Score</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:28px;font-weight:700;color:#38bdf8">${d.readiness_score}<span style="font-size:14px;color:#64748b">%</span></div>
+          ${scoreBar(d.readiness_score)}
+        </div>
+      </div>
+    </div>
+    <div class="grid-2">
+      <div class="card">
+        <h3>Strengths</h3>
+        <ul style="padding-left:18px;font-size:13px;color:#86efac;line-height:1.7">
+          ${(d.strength_areas||[]).map(s=>`<li>${esc(s)}</li>`).join('')||'<li>—</li>'}
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Improvement Areas</h3>
+        <ul style="padding-left:18px;font-size:13px;color:#fde047;line-height:1.7">
+          ${(d.improvement_areas||[]).map(s=>`<li>${esc(s)}</li>`).join('')||'<li>—</li>'}
+        </ul>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Interview Questions (${(d.interview_questions||[]).length})</h3>
+      ${(d.interview_questions||[]).map((q,i)=>`
+        <div class="q-card">
+          <div class="qt">${i+1}. ${esc(q.question)}</div>
+          <div class="qm">${esc(q.category)} · ${esc(q.difficulty)}</div>
+          ${q.ideal_answer_points?.length?`<div style="font-size:11px;color:#64748b;margin-bottom:4px">Key points to cover:</div>
+          <ul>${q.ideal_answer_points.map(p=>`<li>${esc(p)}</li>`).join('')}</ul>`:''}
+        </div>`).join('')}
+    </div>
+    <div class="card">
+      <h3>Preparation Plan</h3>
+      <ol style="padding-left:20px;font-size:13px;color:#94a3b8;line-height:1.8">
+        ${(d.preparation_plan||[]).map(s=>`<li>${esc(s)}</li>`).join('')||'<li>—</li>'}
+      </ol>
+    </div>
+    <div class="card" style="border-color:#818cf8">
+      <h3>Final Advice</h3>
+      <div style="font-size:14px;color:#e2e8f0;line-height:1.7;font-style:italic">"${esc(d.final_advice)}"</div>
+    </div>`;
+}
+</script>
+</body>
+</html>

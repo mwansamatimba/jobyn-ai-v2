@@ -26,6 +26,7 @@ from backend.models.enums import (
 from backend.models.mixins import SoftDeleteMixin, TimestampMixin, UUIDPrimaryKeyMixin
 
 if TYPE_CHECKING:
+    from backend.models.career import CareerInsight
     from backend.models.job import Application, MatchResult
     from backend.models.user import User
 
@@ -81,6 +82,9 @@ class Resume(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     )
     match_results: Mapped[list[MatchResult]] = orm_relationship(back_populates="resume")
     applications: Mapped[list[Application]] = orm_relationship(back_populates="resume")
+    career_insights: Mapped[list[CareerInsight]] = orm_relationship(
+        back_populates="resume",
+    )
 
 
 class UploadedResume(UUIDPrimaryKeyMixin, TimestampMixin, Base):

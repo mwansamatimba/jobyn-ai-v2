@@ -20,6 +20,7 @@ from backend.database.base_class import Base
 from backend.models.mixins import SoftDeleteMixin, TimestampMixin, UUIDPrimaryKeyMixin
 
 if TYPE_CHECKING:
+    from backend.models.career import CareerInsight
     from backend.models.job import Application, Job, MatchResult
     from backend.models.resume import GeneratedResume, Resume, ResumeDraft, UploadedResume
     from backend.models.user_profile import (
@@ -96,6 +97,12 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     created_jobs: Mapped[list[Job]] = relationship(back_populates="created_by_user")
     match_results: Mapped[list[MatchResult]] = relationship(back_populates="user")
     applications: Mapped[list[Application]] = relationship(back_populates="user")
+
+    # Career intelligence: persisted AI career analyses.
+    career_insights: Mapped[list[CareerInsight]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
 
     @property
     def subject(self) -> str:

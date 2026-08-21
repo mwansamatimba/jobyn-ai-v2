@@ -20,6 +20,7 @@ README to avoid mapper errors:
   target
 """
 
+from backend.models.career import CareerInsight
 from backend.models.enums import (
     ApplicationStatus,
     DraftStatus,
@@ -54,6 +55,7 @@ from backend.models.user_profile import (
 __all__ = [
     "Application",
     "ApplicationStatus",
+    "CareerInsight",
     "DraftStatus",
     "EmploymentType",
     "ExperienceLevel",
