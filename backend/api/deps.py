@@ -1,8 +1,7 @@
 """Reusable FastAPI dependency injection module.
 
-Single source of truth for request-scoped dependencies: database sessions,
-repositories, services and the authenticated user. Route modules consume these
-dependencies instead of building repositories or services themselves.
+Centralized request-scoped dependencies for database sessions,
+repositories, authentication services, and authenticated users.
 """
 
 from __future__ import annotations
@@ -30,20 +29,16 @@ __all__ = [
 ]
 
 
+# IMPORTANT:
+# This must match the actual API route exposed by FastAPI.
 oauth2_scheme = OAuth2PasswordBearer(
-    tokenUrl="/auth/login"
+    tokenUrl="/api/v1/auth/login"
 )
 
 
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
-    """Yield a request-scoped async database session.
+    """Yield a request-scoped async database session."""
 
-    Only the session lifecycle is managed here; committing and rolling back
-    are left to the surrounding unit of work.
-
-    Yields:
-        An open AsyncSession for the current request.
-    """
     async with async_session_maker() as session:
         yield session
 
@@ -51,14 +46,8 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
 async def get_user_repository(
     session: AsyncSession = Depends(get_session),
 ) -> UserRepository:
-    """Provide a request-scoped UserRepository.
+    """Provide a request-scoped UserRepository."""
 
-    Args:
-        session: The request-scoped async database session.
-
-    Returns:
-        A repository bound to the User model.
-    """
     return UserRepository(
         session=session,
         model=User,
@@ -68,14 +57,8 @@ async def get_user_repository(
 async def get_auth_service(
     repository: UserRepository = Depends(get_user_repository),
 ) -> AuthService:
-    """Provide a request-scoped AuthService.
+    """Provide a request-scoped AuthService."""
 
-    Args:
-        repository: Injected UserRepository.
-
-    Returns:
-        AuthService instance.
-    """
     return AuthService(repository)
 
 
@@ -83,22 +66,8 @@ async def get_current_user(
     token: str = Depends(oauth2_scheme),
     repository: UserRepository = Depends(get_user_repository),
 ) -> User:
-    """Resolve authenticated user from bearer token.
+    """Resolve the authenticated user from a JWT bearer token."""
 
-    Args:
-        token:
-            JWT bearer token.
-
-        repository:
-            User repository dependency.
-
-    Returns:
-        Authenticated User instance.
-
-    Raises:
-        InvalidTokenError:
-            If token subject is invalid or user does not exist.
-    """
     payload = verify_token(token)
 
     try:

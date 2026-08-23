@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from backend.ai.gemini import GeminiError, generate_json
+from backend.ai.llm import LLMError, generate_json
 
 _OUTPUT_SCHEMA = """{
   "name": "",
@@ -68,7 +68,7 @@ class CVAnalyzerService:
 
         try:
             profile = await generate_json(prompt)
-        except GeminiError as exc:
+        except LLMError as exc:
             raise CVAnalysisError("Failed to analyze the CV.") from exc
 
         return self._normalize_profile(profile)

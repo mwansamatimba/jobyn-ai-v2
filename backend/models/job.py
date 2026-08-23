@@ -145,6 +145,11 @@ class MatchResult(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     weaknesses: Mapped[list | None] = mapped_column(JSON, nullable=True)
     summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    matcher_type: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        server_default="deterministic",
+    )
 
     user: Mapped[User] = orm_relationship(back_populates="match_results")
     resume: Mapped[Resume | None] = orm_relationship(back_populates="match_results")

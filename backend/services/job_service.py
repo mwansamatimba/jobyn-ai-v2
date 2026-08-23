@@ -147,6 +147,7 @@ class JobDiscoveryService(BaseService[JobRepository]):
                 weaknesses=[],
                 summary=reason,
                 status=_MATCH_STATUS_COMPLETED,
+                matcher_type="ai",
             )
 
             match_items.append(
@@ -224,6 +225,7 @@ class JobDiscoveryService(BaseService[JobRepository]):
         *,
         offset: int = 0,
         limit: int = 50,
+        matcher_type: str | None = None,
     ) -> tuple[list[MatchResult], int]:
         """Return a user's stored match results and total count.
 
@@ -231,20 +233,103 @@ class JobDiscoveryService(BaseService[JobRepository]):
             user_id: The user's UUID.
             offset: Number of records to skip.
             limit: Maximum number of records to return.
+            matcher_type: Optional filter — ``deterministic`` or ``ai``.
 
         Returns:
             A tuple of (match results list, total count).
         """
         matches = await self.match_result_repository.get_user_matches(
-            user_id, offset=offset, limit=limit
+            user_id, offset=offset, limit=limit, matcher_type=matcher_type
         )
-        # Count without pagination for the pagination envelope.
-        total = len(
-            await self.match_result_repository.get_user_matches(
-                user_id, offset=0, limit=10_000
-            )
-        )
+        count_filters: dict[str, Any] = {"user_id": user_id}
+        if matcher_type is not None:
+            count_filters["matcher_type"] = matcher_type
+        total = await self.match_result_repository.count(**count_filters)
         return matches, total
+
+    # ------------------------------------------------------------------ #
+    # Deterministic matching (no LLM)                                    #
+    # ------------------------------------------------------------------ #
+
+    async def deterministic_match_for_user(
+        self,
+        user_id: uuid.UUID,
+        resume_id: uuid.UUID | None = None,
+        top_n: int = 10,
+    ) -> "DeterministicMatchResponse":
+        """Run the deterministic matcher against all active jobs.
+
+        Uses ``backend.matching.matcher.match_candidate_to_job`` — no LLM,
+        no external API.  Results are ranked by match_score descending and
+        the top ``top_n`` are returned.  MatchResult records are persisted
+        for the returned matches.
+
+        Raises:
+            NoResumeError: When the user has no parsed resume.
+            NoJobsError: When there are no active jobs.
+        """
+        from decimal import Decimal as _Dec
+        from backend.matching.matcher import match_candidate_to_job
+        from backend.schemas.job import DeterministicMatchItem, DeterministicMatchResponse
+
+        resume = await self._resolve_resume(user_id, resume_id)
+        candidate_profile = resume.content or {}
+
+        jobs = await self.job_repository.get_active_jobs(limit=500)
+        if not jobs:
+            raise NoJobsError("No active jobs are available for matching.")
+
+        # Score every job
+        scored: list[tuple[Job, Any]] = []
+        for job in jobs:
+            result = match_candidate_to_job(candidate_profile, job)
+            scored.append((job, result))
+
+        # Sort descending by match_score
+        scored.sort(key=lambda x: x[1].match_score, reverse=True)
+        top = scored[:top_n]
+
+        # Persist and build response items
+        items: list[DeterministicMatchItem] = []
+        for job, mr in top:
+            await self.match_result_repository.create(
+                user_id=user_id,
+                resume_id=resume.id,
+                job_id=job.id,
+                match_score=_Dec(str(mr.match_score)),
+                matched_skills=mr.matched_skills,
+                missing_skills=mr.missing_skills,
+                strengths=[],
+                weaknesses=[],
+                summary=f"{mr.match_level} — {mr.recommendation}",
+                status="completed",
+                matcher_type="deterministic",
+            )
+            items.append(DeterministicMatchItem(
+                job_id=job.id,
+                job_title=job.title,
+                company=job.company_name,
+                location=job.location,
+                employment_type=str(job.employment_type) if job.employment_type else None,
+                match_score=mr.match_score,
+                match_level=mr.match_level,
+                matched_skills=mr.matched_skills,
+                missing_skills=mr.missing_skills,
+                experience_match=mr.experience_match,
+                role_match=mr.role_match,
+                recommendation=mr.recommendation,
+                skill_score=mr.skill_score,
+                experience_score=mr.experience_score,
+                role_score=mr.role_score,
+            ))
+
+        await self.commit()
+
+        return DeterministicMatchResponse(
+            resume_id=resume.id,
+            total_jobs_evaluated=len(jobs),
+            matches=items,
+        )
 
     # ------------------------------------------------------------------ #
     # Internal helpers                                                     #

@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from backend.ai.gemini import GeminiError, generate_json
+from backend.ai.llm import LLMError, generate_json
 
 _OUTPUT_SCHEMA = """{
   "top_matches": [
@@ -68,7 +68,7 @@ class JobMatcherService:
 
         try:
             result = await generate_json(prompt)
-        except GeminiError as exc:
+        except LLMError as exc:
             raise JobMatcherError("Failed to generate job matches.") from exc
 
         return self._normalize_response(result)

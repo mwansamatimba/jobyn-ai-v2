@@ -65,12 +65,14 @@ class MatchResultRepository(BaseRepository[MatchResult]):
         *,
         offset: int = 0,
         limit: int = 50,
+        matcher_type: str | None = None,
     ) -> list[MatchResult]:
         """Return match results for a user, newest first."""
+        stmt = select(MatchResult).where(MatchResult.user_id == user_id)
+        if matcher_type is not None:
+            stmt = stmt.where(MatchResult.matcher_type == matcher_type)
         stmt = (
-            select(MatchResult)
-            .where(MatchResult.user_id == user_id)
-            .order_by(MatchResult.created_at.desc())
+            stmt.order_by(MatchResult.created_at.desc())
             .offset(offset)
             .limit(limit)
         )

@@ -31,13 +31,18 @@ class Settings(BaseSettings):
     DEBUG: bool = False
     LOG_LEVEL: str = "INFO"
 
-    # Gemini
-    GEMINI_API_KEY: str | None = None
-    GEMINI_MODEL: str = "gemini-2.0-flash"
-    GEMINI_TIMEOUT_SECONDS: float = 60.0
+    # LLM
+    LLM_PROVIDER: str = "nvidia"
+    NVIDIA_API_KEY: str | None = None
+    NVIDIA_BASE_URL: str = "https://integrate.api.nvidia.com/v1"
+    NVIDIA_MODEL: str = ""
+    LLM_TIMEOUT_SECONDS: float = 60.0
 
+    TABITOKEN_API_KEY: str = "sk-ZDTlMGhJMcGFBNWmRnh3fgrZlu8Zi6FJddhXpBRK6pgCnFEk" 
+    TABITOKEN_BASE_URL: str = "https://tabitoken.com/v1"
+    TABITOKEN_COVER_LETTER_MODEL: str = "claude-opus-5"
     API_V1_PREFIX: str = "/api/v1"
-
+    TABITOKEN_FALLBACK_ENABLED: bool = True
     SECRET_KEY: str = "change-me-in-production"
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 10080

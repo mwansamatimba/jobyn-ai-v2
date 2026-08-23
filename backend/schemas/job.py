@@ -84,6 +84,7 @@ class MatchResultRead(ORMModel):
     weaknesses: list[str] | None
     summary: str | None
     status: str | None
+    matcher_type: str
     created_at: datetime
 
 
@@ -120,3 +121,36 @@ class JobMatchResponse(BaseModel):
 
 JobListResponse = PaginatedResponse[JobRead]
 MatchListResponse = PaginatedResponse[MatchResultRead]
+
+
+# ------------------------------------------------------------------ #
+# Deterministic match schemas                                          #
+# ------------------------------------------------------------------ #
+
+
+class DeterministicMatchItem(BaseModel):
+    """One ranked match entry from the deterministic matching engine."""
+
+    job_id: uuid.UUID
+    job_title: str
+    company: str
+    location: str | None
+    employment_type: str | None
+    match_score: int
+    match_level: str
+    matched_skills: list[str]
+    missing_skills: list[str]
+    experience_match: bool
+    role_match: bool
+    recommendation: str
+    skill_score: int
+    experience_score: int
+    role_score: int
+
+
+class DeterministicMatchResponse(BaseModel):
+    """Response for POST /jobs/deterministic-match."""
+
+    resume_id: uuid.UUID
+    total_jobs_evaluated: int
+    matches: list[DeterministicMatchItem]

@@ -369,6 +369,7 @@ def test_match_persists_to_match_results_table(client: TestClient, job_with_resu
     item = body["items"][0]
     assert item["job_id"] == job_id
     assert item["status"] == "completed"
+    assert item["matcher_type"] == "ai"
 
 
 def test_match_without_resume_returns_404(client: TestClient, client_no_resume=None):

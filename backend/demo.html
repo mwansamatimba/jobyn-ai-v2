@@ -400,44 +400,46 @@ function populateJobSelects(jobs) {
   });
 }
 
-// POST /api/v1/jobs/match
+// POST /api/v1/jobs/deterministic-match
 async function runMatch() {
   const el = document.getElementById('dash-match-result');
   const jobsMsg = document.getElementById('jobs-msg');
-  el.innerHTML = `<div class="msg info">${spin()}Running AI job matching — this may take up to 30 seconds…</div>`;
+  el.innerHTML = `<div class="msg info">${spin()}Running deterministic job matching…</div>`;
   if (jobsMsg) showMsg(jobsMsg,'info',spin()+'Matching your profile against available jobs…');
   showTab('dashboard');
-  const r = await api('/api/v1/jobs/match','POST');
+  const r = await api('/api/v1/jobs/deterministic-match','POST');
   if (!r.ok) {
     const detail = r.data?.detail || 'Matching failed. Make sure you have uploaded a resume.';
     el.innerHTML = `<div class="msg err">${esc(detail)}</div>`;
+    if (jobsMsg) showMsg(jobsMsg,'err',esc(detail));
     return;
   }
-  const matches = r.data.top_matches || [];
+  const matches = r.data.matches || [];
   if (!matches.length) { el.innerHTML = '<div class="msg info">No matches returned. Try uploading or updating your resume.</div>'; return; }
-  el.innerHTML = `<h3 style="margin-bottom:12px">⚡ AI Job Matches</h3>
-    <div style="font-size:13px;color:#64748b;margin-bottom:16px">${esc(r.data.overall_match_summary||'')}</div>` +
+  const evaluated = r.data.total_jobs_evaluated ?? matches.length;
+  el.innerHTML = `<h3 style="margin-bottom:12px">⚡ Job Matches</h3>
+    <div style="font-size:13px;color:#64748b;margin-bottom:16px">Evaluated ${esc(String(evaluated))} job(s)</div>` +
     matches.map(m=>`
     <div class="card" style="margin-bottom:12px">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
         <div>
-          <div style="font-size:15px;font-weight:600;color:#f1f5f9">${esc(m.job_title)}</div>
-          <div style="font-size:13px;color:#38bdf8">${esc(m.company)}</div>
+          <div style="font-size:15px;font-weight:600;color:#f1f5f9">${esc(m.job_title||'Untitled role')}</div>
+          <div style="font-size:13px;color:#38bdf8">${esc(m.company||'—')}</div>
+          <div style="font-size:12px;color:#94a3b8;margin-top:4px">${esc(m.location||'—')}${m.employment_type ? ' · '+esc(m.employment_type) : ''}</div>
         </div>
         <div style="text-align:right">
-          <div style="font-size:22px;font-weight:700;color:#38bdf8">${m.match_score}<span style="font-size:13px;color:#64748b">%</span></div>
-          ${scoreBar(m.match_score)}
+          <div style="font-size:22px;font-weight:700;color:#38bdf8">${m.match_score ?? 0}<span style="font-size:13px;color:#64748b">%</span></div>
+          ${scoreBar(m.match_score ?? 0)}
         </div>
       </div>
-      <div style="font-size:13px;color:#94a3b8;margin-bottom:10px">${esc(m.reason)}</div>
-      <label>Matching Skills</label><div style="margin-bottom:8px">${tags(m.matching_skills,'green')}</div>
-      <label>Missing Skills</label><div>${tags(m.missing_skills,'yellow')}</div>
-    </div>`).join('') +
-    (r.data.recommended_next_actions?.length ? `
-    <div class="card"><h3>Next Actions</h3>
-      <ul style="padding-left:18px;font-size:13px;color:#94a3b8;line-height:1.8">
-        ${(r.data.recommended_next_actions||[]).map(a=>`<li>${esc(a)}</li>`).join('')}
-      </ul></div>` : '');
+      <div style="font-size:13px;color:#94a3b8;margin-bottom:10px">
+        ${esc(m.match_level||'—')} · ${esc(m.recommendation||'—')}
+        · Experience: ${m.experience_match ? 'Yes' : 'No'}
+        · Role: ${m.role_match ? 'Yes' : 'No'}
+      </div>
+      <label>Matched Skills</label><div style="margin-bottom:8px">${tags(m.matched_skills||[],'green')||'<span style="font-size:12px;color:#64748b">None</span>'}</div>
+      <label>Missing Skills</label><div>${tags(m.missing_skills||[],'yellow')||'<span style="font-size:12px;color:#64748b">None</span>'}</div>
+    </div>`).join('');
 }
 </script>
 <script>

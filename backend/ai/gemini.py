@@ -207,7 +207,6 @@ class GeminiClient:
                     model=model or self._model,
                     contents=prompt,
                     config=genai_types.GenerateContentConfig(**config),
-                    timeout=self._timeout_seconds,
                 )
 
             raise GeminiGenerationError(

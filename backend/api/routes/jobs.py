@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -35,6 +36,7 @@ from backend.schemas.job import (
     JobRead,
     MatchListResponse,
     MatchResultRead,
+    DeterministicMatchResponse,
 )
 from backend.services.job_service import (
     JobDiscoveryService,
@@ -152,12 +154,16 @@ async def list_jobs(
 async def list_matches(
     offset: int = Query(default=0, ge=0),
     limit: int = Query(default=50, ge=1, le=200),
+    matcher_type: Literal["deterministic", "ai"] | None = Query(
+        default=None,
+        description="Optional filter by matcher source: deterministic or ai.",
+    ),
     current_user: User = Depends(get_current_user),
     service: JobDiscoveryService = Depends(_get_job_service),
 ) -> MatchListResponse:
     """Return the authenticated user's previously computed match results."""
     matches, total = await service.get_user_matches(
-        current_user.id, offset=offset, limit=limit
+        current_user.id, offset=offset, limit=limit, matcher_type=matcher_type
     )
     return PaginatedResponse(
         items=[MatchResultRead.model_validate(m) for m in matches],
@@ -217,3 +223,68 @@ async def create_job(
         created_by_user_id=current_user.id,
     )
     return JobRead.model_validate(job)
+
+
+# ------------------------------------------------------------------ #
+# Deterministic match endpoint (no LLM)                               #
+# ------------------------------------------------------------------ #
+
+
+@router.post(
+    "/deterministic-match",
+    response_model=DeterministicMatchResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Rank all active jobs against the caller's resume (deterministic, no LLM)",
+)
+async def deterministic_match_jobs(
+    resume_id: uuid.UUID | None = Query(default=None),
+    top_n: int = Query(default=10, ge=1, le=50),
+    current_user: User = Depends(get_current_user),
+    service: JobDiscoveryService = Depends(_get_job_service),
+) -> DeterministicMatchResponse:
+    """Score every active job against the user's parsed resume without an LLM.
+
+    Results are ranked by match_score descending.  Match results are persisted.
+
+    Raises:
+        404: No parsed resume or no active jobs.
+    """
+    try:
+        return await service.deterministic_match_for_user(
+            user_id=current_user.id,
+            resume_id=resume_id,
+            top_n=top_n,
+        )
+    except NoResumeError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except NoJobsError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("Deterministic match failed for user %s", current_user.id)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)) from exc
+
+
+# ------------------------------------------------------------------ #
+# Ingest trigger (dev/admin)                                           #
+# ------------------------------------------------------------------ #
+
+
+@router.post(
+    "/ingest",
+    status_code=status.HTTP_200_OK,
+    summary="Trigger job ingestion from Remotive (dev/admin)",
+    include_in_schema=True,
+    tags=["Jobs"],
+)
+async def trigger_ingest(
+    category: str = Query(default="software-dev"),
+    limit: int = Query(default=50, ge=1, le=200),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """Fetch and persist jobs from the Remotive public API.
+
+    Idempotent — duplicate URLs are skipped.
+    """
+    from backend.services.job_ingestion import ingest_jobs
+    result = await ingest_jobs(category=category, limit=limit)
+    return result.to_dict()

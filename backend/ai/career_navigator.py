@@ -8,9 +8,12 @@ frameworks, databases and API layers.
 from __future__ import annotations
 
 import json
+import logging
 from typing import Any
 
-from backend.ai.gemini import GeminiError, generate_json
+from backend.ai.llm import LLMError, generate_json
+
+logger = logging.getLogger(__name__)
 
 _OUTPUT_SCHEMA = """{
   "career_direction": "",
@@ -80,7 +83,14 @@ class CareerNavigatorService:
 
         try:
             result = await generate_json(prompt)
-        except GeminiError as exc:
+        except LLMError as exc:
+            # Safe external message; underlying NIM details are logged in llm.py.
+            logger.exception(
+                "CareerNavigatorService.navigate failed after LLMError "
+                "exception_type=%s exception_message=%s",
+                type(exc).__name__,
+                str(exc),
+            )
             raise CareerNavigatorError("Failed to generate career guidance.") from exc
 
         return self._normalize_response(result)
