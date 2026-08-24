@@ -21,7 +21,7 @@ from sqlalchemy.exc import IntegrityError
 
 from backend.auth.jwt import create_access_token
 from backend.auth.password import hash_password, verify_password
-from backend.core.config.settings import settings
+from backend.core.config import settings
 from backend.models.user import User
 from backend.repositories.user import UserRepository
 from backend.schemas.auth import TokenResponse

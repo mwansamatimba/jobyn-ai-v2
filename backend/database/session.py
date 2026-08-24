@@ -1,28 +1,8 @@
-"""Async database engine and session factory.
+"""Database engine and session management for Jobyn AI."""
 
-This module is the single source of truth for SQLAlchemy engine and session
-configuration.
+from __future__ import annotations
 
-Responsibilities:
-- Create the SQLAlchemy AsyncEngine once at import time.
-- Automatically use the correct async SQLite driver (aiosqlite).
-- Support PostgreSQL with an async driver.
-- Configure SQLite appropriately for local development/testing.
-- Provide an async_sessionmaker for request-scoped sessions.
-- Provide get_session() for FastAPI dependency injection.
-
-Transaction management intentionally does NOT happen here.
-
-Repositories/services are responsible for:
-    await session.flush()
-
-and the surrounding unit of work is responsible for:
-    await session.commit()
-    await session.rollback()
-"""
-
-from collections.abc import AsyncGenerator, Mapping
-from typing import Any
+from collections.abc import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -30,7 +10,6 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
-from sqlalchemy.pool import StaticPool
 
 from backend.core.config import get_settings
 
@@ -39,166 +18,84 @@ from backend.core.config import get_settings
 # Settings
 # ---------------------------------------------------------------------------
 
-_settings = get_settings()
+settings = get_settings()
+
+DATABASE_URL = settings.DATABASE_URL
 
 
 # ---------------------------------------------------------------------------
-# Database URL normalization
+# Database Engine Configuration
+# ---------------------------------------------------------------------------
+#
+# Jobyn AI supports:
+#
+#   Production:
+#       PostgreSQL + asyncpg
+#
+#   Tests:
+#       SQLite + aiosqlite
+#
+# Supabase's transaction pooler uses PgBouncer. With asyncpg, prepared
+# statement caching should be disabled by setting:
+#
+#       statement_cache_size = 0
+#
+# However, that argument is NOT supported by aiosqlite.
+#
+# Therefore connect_args must be selected based on the database URL.
 # ---------------------------------------------------------------------------
 
-def _normalize_database_url(database_url: str) -> str:
-    """Convert configured database URLs to async SQLAlchemy URLs.
+connect_args: dict = {}
 
-    SQLite:
-        sqlite:///./jobyn.db
-            ->
-        sqlite+aiosqlite:///./jobyn.db
-
-    PostgreSQL:
-        postgresql://...
-            ->
-        postgresql+asyncpg://...
-
-    Already-correct async URLs are returned unchanged.
-
-    Args:
-        database_url: Database URL from application settings.
-
-    Returns:
-        A database URL compatible with SQLAlchemy's async engine.
-    """
-    database_url = database_url.strip()
-
-    # SQLite ---------------------------------------------------------------
-    if database_url.startswith("sqlite://"):
-        if database_url.startswith("sqlite+aiosqlite://"):
-            return database_url
-
-        return database_url.replace(
-            "sqlite://",
-            "sqlite+aiosqlite://",
-            1,
-        )
-
-    # PostgreSQL -----------------------------------------------------------
-    if database_url.startswith("postgresql://"):
-        return database_url.replace(
-            "postgresql://",
-            "postgresql+asyncpg://",
-            1,
-        )
-
-    if database_url.startswith("postgres://"):
-        return database_url.replace(
-            "postgres://",
-            "postgresql+asyncpg://",
-            1,
-        )
-
-    # Already using an async PostgreSQL driver.
-    if database_url.startswith("postgresql+asyncpg://"):
-        return database_url
-
-    # Any other SQLAlchemy-compatible async URL is passed through.
-    return database_url
-
-
-# ---------------------------------------------------------------------------
-# Engine configuration
-# ---------------------------------------------------------------------------
-
-def _engine_options(database_url: str) -> Mapping[str, Any]:
-    """Return engine options based on the database backend.
-
-    SQLite is optimized for local development and testing.
-
-    PostgreSQL uses connection pooling and health checks.
-    """
-    if database_url.startswith("sqlite+aiosqlite://"):
-        return {
-            "connect_args": {
-                "check_same_thread": False,
-            },
-            "poolclass": StaticPool,
-        }
-
-    return {
-        "pool_pre_ping": True,
-        "pool_size": 5,
-        "max_overflow": 10,
-        "pool_recycle": 1800,
+if DATABASE_URL.startswith("postgresql+asyncpg://"):
+    connect_args = {
+        "statement_cache_size": 0,
     }
 
 
 # ---------------------------------------------------------------------------
-# Database URL
-# ---------------------------------------------------------------------------
-
-DATABASE_URL = _normalize_database_url(
-    _settings.DATABASE_URL
-)
-
-
-# ---------------------------------------------------------------------------
-# Async SQLAlchemy engine
+# Database Engine
 # ---------------------------------------------------------------------------
 
 engine: AsyncEngine = create_async_engine(
     DATABASE_URL,
-    echo=_settings.DEBUG,
-    **_engine_options(DATABASE_URL),
+    echo=False,
+    pool_pre_ping=True,
+    connect_args=connect_args,
 )
 
 
 # ---------------------------------------------------------------------------
-# Async session factory
+# Async Session Factory
 # ---------------------------------------------------------------------------
 
-async_session_factory: async_sessionmaker[AsyncSession] = (
-    async_sessionmaker(
-        bind=engine,
-        class_=AsyncSession,
-        expire_on_commit=False,
-        autoflush=False,
-        autocommit=False,
-    )
+async_session_maker = async_sessionmaker(
+    bind=engine,
+    class_=AsyncSession,
+    expire_on_commit=False,
+    autoflush=False,
+    autocommit=False,
 )
 
 
 # ---------------------------------------------------------------------------
-# Backwards-compatible alias
+# Backwards-compatible aliases
 # ---------------------------------------------------------------------------
 
-# Used by backend.api.deps.py and potentially other modules.
-async_session_maker = async_session_factory
+AsyncSessionLocal = async_session_maker
+async_session_factory = async_session_maker
 
 
 # ---------------------------------------------------------------------------
 # FastAPI database dependency
 # ---------------------------------------------------------------------------
 
-async def get_session() -> AsyncGenerator[AsyncSession, None]:
-    """Yield a request-scoped asynchronous database session.
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
+    """Provide an async database session to FastAPI routes."""
 
-    The session lifecycle is managed here.
-
-    Transactions are intentionally NOT committed or rolled back here.
-    Services/endpoints control the unit-of-work boundary.
-
-    Yields:
-        An open AsyncSession for the current request.
-    """
-    async with async_session_factory() as session:
-        yield session
-
-
-# ---------------------------------------------------------------------------
-# Engine shutdown
-# ---------------------------------------------------------------------------
-
-async def dispose_engine() -> None:
-    """Dispose of the SQLAlchemy connection pool.
-
-    This can be called during FastAPI application shutdown.
-    """
-    await engine.dispose()
+    async with async_session_maker() as session:
+        try:
+            yield session
+        except Exception:
+            await session.rollback()
+            raise

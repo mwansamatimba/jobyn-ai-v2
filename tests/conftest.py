@@ -1,12 +1,4 @@
-"""Test configuration.
-
-Environment variables are set before any application module is imported so the
-engine in ``backend/database/session.py`` is created against a throwaway
-file-based SQLite database and a fixed test secret. A file (not in-memory) is
-used so the app engine and the async test fixtures never share a connection
-across different event loops. Setting variables with ``setdefault`` lets CI
-override ``DATABASE_URL`` to run the suite against PostgreSQL.
-"""
+"""Test configuration."""
 
 import os
 import tempfile
@@ -14,9 +6,19 @@ from collections.abc import AsyncIterator
 
 _TEST_DIR = tempfile.mkdtemp(prefix="jobyn_test_")
 
-os.environ.setdefault("ENVIRONMENT", "test")
-os.environ.setdefault("DATABASE_URL", f"sqlite+aiosqlite:///{_TEST_DIR}/test.db")
-os.environ.setdefault("SECRET_KEY", "test-secret-key-0123456789abcdef0123456789abcdef")
+# ---------------------------------------------------------------------------
+# Force tests to use an isolated SQLite database.
+# ---------------------------------------------------------------------------
+
+os.environ["ENVIRONMENT"] = "test"
+
+os.environ["DATABASE_URL"] = (
+    f"sqlite+aiosqlite:///{_TEST_DIR}/test.db"
+)
+
+os.environ["SECRET_KEY"] = (
+    "test-secret-key-0123456789abcdef0123456789abcdef"
+)
 
 import asyncio  # noqa: E402
 

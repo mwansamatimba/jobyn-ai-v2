@@ -1,0 +1,27 @@
+@"
+.venv/
+.venv312/
+jobyn-env/
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.git/
+.github/
+.vscode/
+tests/
+*.pyc
+*.pyo
+*.db
+*.sqlite
+*.sqlite3
+*.bak
+.env
+.env.*
+!.env.example
+node_modules/
+dist/
+build/
+coverage/
+htmlcov/
+"@ | Set-Content .vercelignore

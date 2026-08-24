@@ -41,9 +41,17 @@ from openai import (
 # Environment
 # ============================================================================
 
+# Expected structure:
+#
+# Jobyn AI/
+# ├── backend/
+# │   └── ai/
+# │       └── llm.py
+# └── .env
+#
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
-# Load project .env explicitly.
+# Explicitly load the project's .env file.
 load_dotenv(PROJECT_ROOT / ".env")
 
 
@@ -63,10 +71,10 @@ NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY")
 NVIDIA_BASE_URL = os.getenv(
     "NVIDIA_BASE_URL",
     "https://integrate.api.nvidia.com/v1",
-)
+).rstrip("/")
 
 # IMPORTANT:
-# GLM-5.2 is retired and must not be used as the fallback.
+# Do not use the retired GLM model as a fallback.
 NVIDIA_MODEL = os.getenv(
     "NVIDIA_MODEL",
     "nvidia/nemotron-3.5-lightning-30b-a3b",
@@ -78,26 +86,74 @@ _PROVIDER = "nvidia_nim"
 # Logging protection.
 _MAX_BODY_LOG_CHARS = 2000
 
-# Default Nemotron behavior for Jobyn.
-#
-# For resume parsing, candidate profiling, cover letters and JSON extraction,
-# we generally want direct instruction-following rather than visible reasoning.
+# ============================================================================
+# Nemotron defaults
+# ============================================================================
+
 DEFAULT_ENABLE_THINKING = (
-    os.getenv("NVIDIA_ENABLE_THINKING", "false").strip().lower()
+    os.getenv("NVIDIA_ENABLE_THINKING", "false")
+    .strip()
+    .lower()
     in {"1", "true", "yes", "on"}
 )
 
-# Optional reasoning budget when thinking mode is enabled.
-#
-# NVIDIA documents reasoning_budget for Nemotron's thinking mode.
-DEFAULT_REASONING_BUDGET = int(
-    os.getenv("NVIDIA_REASONING_BUDGET", "8192")
-)
 
-# Optional top-p.
-DEFAULT_TOP_P = float(
-    os.getenv("NVIDIA_TOP_P", "0.95")
-)
+def _get_reasoning_budget() -> int:
+    """
+    Read and validate NVIDIA reasoning budget from environment.
+    """
+
+    raw_value = os.getenv("NVIDIA_REASONING_BUDGET", "8192")
+
+    try:
+        value = int(raw_value)
+    except ValueError:
+        logger.warning(
+            "Invalid NVIDIA_REASONING_BUDGET=%r. Using 8192.",
+            raw_value,
+        )
+        return 8192
+
+    if value < 1:
+        logger.warning(
+            "NVIDIA_REASONING_BUDGET must be greater than zero. "
+            "Using 8192."
+        )
+        return 8192
+
+    return value
+
+
+DEFAULT_REASONING_BUDGET = _get_reasoning_budget()
+
+
+def _get_top_p() -> float:
+    """
+    Read and validate top_p from environment.
+    """
+
+    raw_value = os.getenv("NVIDIA_TOP_P", "0.95")
+
+    try:
+        value = float(raw_value)
+    except ValueError:
+        logger.warning(
+            "Invalid NVIDIA_TOP_P=%r. Using 0.95.",
+            raw_value,
+        )
+        return 0.95
+
+    if not 0 < value <= 1:
+        logger.warning(
+            "NVIDIA_TOP_P must be greater than 0 and <= 1. "
+            "Using 0.95."
+        )
+        return 0.95
+
+    return value
+
+
+DEFAULT_TOP_P = _get_top_p()
 
 
 # ============================================================================
@@ -106,7 +162,9 @@ DEFAULT_TOP_P = float(
 
 
 class LLMError(Exception):
-    """Raised when an LLM provider request fails."""
+    """
+    Raised when an LLM provider request fails.
+    """
 
 
 # ============================================================================
@@ -120,22 +178,24 @@ def _get_client() -> AsyncOpenAI:
     """
     Return the shared NVIDIA NIM OpenAI-compatible client.
 
-    The client is created lazily so importing backend.ai.llm does not
-    immediately fail if the API key is missing.
+    The client is created lazily so importing this module does not
+    immediately fail if NVIDIA_API_KEY is missing.
     """
 
     global _client
 
     if _client is None:
-        if not NVIDIA_API_KEY:
+        api_key = NVIDIA_API_KEY
+
+        if not api_key:
             raise LLMError(
                 "NVIDIA_API_KEY is not configured. "
                 "Add NVIDIA_API_KEY to the project's .env file."
             )
 
         _client = AsyncOpenAI(
+            api_key=api_key,
             base_url=NVIDIA_BASE_URL,
-            api_key=NVIDIA_API_KEY,
         )
 
     return _client
@@ -148,12 +208,12 @@ def _get_client() -> AsyncOpenAI:
 
 def _sanitize_text(text: str | None) -> str:
     """
-    Truncate and redact secrets from text before logging.
+    Truncate and redact secrets before logging.
 
-    Never log:
+    Never intentionally logs:
         - NVIDIA API keys
-        - bearer tokens
-        - authorization headers
+        - Bearer tokens
+        - Authorization credentials
     """
 
     if not text:
@@ -162,7 +222,7 @@ def _sanitize_text(text: str | None) -> str:
     sanitized = str(text)
 
     # ------------------------------------------------------------------------
-    # Direct API-key redaction
+    # Direct API key redaction
     # ------------------------------------------------------------------------
 
     if NVIDIA_API_KEY:
@@ -172,7 +232,7 @@ def _sanitize_text(text: str | None) -> str:
         )
 
     # ------------------------------------------------------------------------
-    # Generic bearer-token redaction
+    # Bearer token redaction
     # ------------------------------------------------------------------------
 
     sanitized = re.sub(
@@ -182,17 +242,17 @@ def _sanitize_text(text: str | None) -> str:
     )
 
     # ------------------------------------------------------------------------
-    # Generic API-key patterns
+    # Generic API-key redaction
     # ------------------------------------------------------------------------
 
     sanitized = re.sub(
-        r"(?i)(api[_-]?key\s*[:=]\s*)['\"]?[^'\"\s,}]+",
+        r"""(?i)(api[_-]?key\s*[:=]\s*)['"]?[^'"\s,}]+""",
         r"\1[REDACTED_API_KEY]",
         sanitized,
     )
 
     # ------------------------------------------------------------------------
-    # Truncate very large error bodies
+    # Truncate very large bodies
     # ------------------------------------------------------------------------
 
     if len(sanitized) > _MAX_BODY_LOG_CHARS:
@@ -204,11 +264,9 @@ def _sanitize_text(text: str | None) -> str:
     return sanitized
 
 
-def _classify_nim_exception(
-    exc: BaseException,
-) -> str:
+def _classify_nim_exception(exc: BaseException) -> str:
     """
-    Return a stable category label for NIM failures.
+    Return a stable category label for NVIDIA NIM failures.
     """
 
     if isinstance(exc, APITimeoutError):
@@ -246,11 +304,7 @@ def _extract_http_details(
     # HTTP status
     # ------------------------------------------------------------------------
 
-    status = getattr(
-        exc,
-        "status_code",
-        None,
-    )
+    status = getattr(exc, "status_code", None)
 
     if status is not None:
         details["http_status"] = status
@@ -259,11 +313,7 @@ def _extract_http_details(
     # Exception body
     # ------------------------------------------------------------------------
 
-    body = getattr(
-        exc,
-        "body",
-        None,
-    )
+    body = getattr(exc, "body", None)
 
     if body is not None:
         try:
@@ -277,22 +327,15 @@ def _extract_http_details(
         except Exception:
             body_text = str(body)
 
-        details["response_body"] = _sanitize_text(
-            body_text
-        )
+        details["response_body"] = _sanitize_text(body_text)
 
     # ------------------------------------------------------------------------
     # HTTP response object
     # ------------------------------------------------------------------------
 
-    response = getattr(
-        exc,
-        "response",
-        None,
-    )
+    response = getattr(exc, "response", None)
 
     if response is not None:
-
         if details["http_status"] is None:
             details["http_status"] = getattr(
                 response,
@@ -312,8 +355,8 @@ def _extract_http_details(
                     text = text()
 
                 if text:
-                    details["response_body"] = (
-                        _sanitize_text(str(text))
+                    details["response_body"] = _sanitize_text(
+                        str(text)
                     )
 
             except Exception:
@@ -325,20 +368,13 @@ def _extract_http_details(
 
     if isinstance(exc, APITimeoutError):
         details["timeout"] = True
-
-        details["timeout_info"] = _sanitize_text(
-            str(exc)
-        )
+        details["timeout_info"] = _sanitize_text(str(exc))
 
     # ------------------------------------------------------------------------
     # Request object
     # ------------------------------------------------------------------------
 
-    request = getattr(
-        exc,
-        "request",
-        None,
-    )
+    request = getattr(exc, "request", None)
 
     if request is not None:
         details["has_request_object"] = True
@@ -363,13 +399,9 @@ def _log_nim_failure(
         - API keys
     """
 
-    category = _classify_nim_exception(
-        exc
-    )
+    category = _classify_nim_exception(exc)
 
-    http_details = _extract_http_details(
-        exc
-    )
+    http_details = _extract_http_details(exc)
 
     payload: dict[str, Any] = {
         "provider": _PROVIDER,
@@ -377,9 +409,7 @@ def _log_nim_failure(
         "operation": operation,
         "error_category": category,
         "exception_type": type(exc).__name__,
-        "exception_message": _sanitize_text(
-            str(exc)
-        ),
+        "exception_message": _sanitize_text(str(exc)),
         **http_details,
     }
 
@@ -411,7 +441,7 @@ def _build_extra_body(
     extra_body: dict[str, Any] = {
         "chat_template_kwargs": {
             "enable_thinking": enable_thinking,
-        }
+        },
     }
 
     if enable_thinking and reasoning_budget is not None:
@@ -425,23 +455,21 @@ def _build_extra_body(
     return extra_body
 
 
-def _extract_message_content(
-    response: Any,
-) -> str:
+def _extract_message_content(response: Any) -> str:
     """
     Safely extract final textual content from an OpenAI-compatible response.
 
     We intentionally use message.content rather than reasoning_content.
-    Jobyn's public services should receive the model's answer, not its
-    internal reasoning trace.
     """
 
-    if not response.choices:
+    choices = getattr(response, "choices", None)
+
+    if not choices:
         raise LLMError(
             "NVIDIA NIM returned no choices."
         )
 
-    message = response.choices[0].message
+    message = choices[0].message
 
     content = getattr(
         message,
@@ -493,16 +521,16 @@ async def generate_text(
             Optional system instruction.
 
         temperature:
-            Sampling temperature. Jobyn defaults to 0.2.
+            Sampling temperature between 0 and 1.
 
         max_tokens:
             Maximum generated tokens.
 
         top_p:
-            Optional nucleus sampling value.
+            Nucleus sampling value.
 
         enable_thinking:
-            Whether Nemotron reasoning/thinking mode is enabled.
+            Whether Nemotron thinking mode is enabled.
 
         reasoning_budget:
             Reasoning token budget when thinking is enabled.
@@ -520,9 +548,7 @@ async def generate_text(
     # ------------------------------------------------------------------------
 
     if not isinstance(prompt, str):
-        raise LLMError(
-            "Prompt must be a string."
-        )
+        raise LLMError("Prompt must be a string.")
 
     if not prompt.strip():
         raise LLMError(
@@ -551,6 +577,11 @@ async def generate_text(
 
     if top_p is None:
         top_p = DEFAULT_TOP_P
+
+    if not isinstance(top_p, (int, float)):
+        raise LLMError(
+            "top_p must be a number."
+        )
 
     if not 0 < top_p <= 1:
         raise LLMError(
@@ -610,8 +641,7 @@ async def generate_text(
         (
             "NVIDIA NIM request starting "
             "provider=%s model=%s operation=%s "
-            "temperature=%s max_tokens=%s top_p=%s "
-            "thinking=%s"
+            "temperature=%s max_tokens=%s top_p=%s thinking=%s"
         ),
         _PROVIDER,
         NVIDIA_MODEL,
@@ -637,14 +667,34 @@ async def generate_text(
             stream=False,
         )
 
+    except (
+        APITimeoutError,
+        APIConnectionError,
+        RateLimitError,
+        APIError,
+    ) as exc:
+
+        _log_nim_failure(
+            operation="generate_text",
+            exc=exc,
+        )
+
+        category = _classify_nim_exception(exc)
+
+        raise LLMError(
+            f"NVIDIA NIM request failed "
+            f"({category})."
+        ) from exc
+
     except Exception as exc:
+
         _log_nim_failure(
             operation="generate_text",
             exc=exc,
         )
 
         raise LLMError(
-            f"NVIDIA NIM request failed: {_sanitize_text(str(exc))}"
+            "Unexpected NVIDIA NIM error."
         ) from exc
 
     # ------------------------------------------------------------------------
@@ -652,11 +702,9 @@ async def generate_text(
     # ------------------------------------------------------------------------
 
     try:
-        content = _extract_message_content(
-            response
-        )
+        content = _extract_message_content(response)
 
-    except LLMError as exc:
+    except LLMError:
         logger.error(
             (
                 "NVIDIA NIM invalid response "
@@ -668,7 +716,7 @@ async def generate_text(
             "generate_text",
         )
 
-        raise exc
+        raise
 
     # ------------------------------------------------------------------------
     # Success
@@ -692,9 +740,7 @@ async def generate_text(
 # ============================================================================
 
 
-def _remove_markdown_json_fence(
-    content: str,
-) -> str:
+def _remove_markdown_json_fence(content: str) -> str:
     """
     Remove common Markdown JSON code fences.
     """
@@ -725,24 +771,16 @@ def _remove_markdown_json_fence(
     return "\n".join(lines).strip()
 
 
-def _extract_json_object(
-    content: str,
-) -> str:
+def _extract_json_object(content: str) -> str:
     """
     Extract a JSON object from slightly noisy model output.
 
     First attempts the entire response.
 
-    If that fails, finds the first '{' and last '}' and attempts to parse
-    that section.
-
-    This is intentionally conservative because resume/profile JSON can
-    contain braces inside strings.
+    If that fails, finds a JSON object using a conservative brace scanner.
     """
 
-    cleaned = _remove_markdown_json_fence(
-        content
-    )
+    cleaned = _remove_markdown_json_fence(content)
 
     # ------------------------------------------------------------------------
     # First attempt: exact response
@@ -758,33 +796,60 @@ def _extract_json_object(
         pass
 
     # ------------------------------------------------------------------------
-    # Second attempt: extract outer object
+    # Second attempt: scan for a balanced JSON object.
+    #
+    # This is safer than simply using find("{") and rfind("}") because
+    # braces may appear inside JSON strings.
     # ------------------------------------------------------------------------
 
-    first_brace = cleaned.find("{")
-    last_brace = cleaned.rfind("}")
+    start_index = cleaned.find("{")
 
-    if (
-        first_brace != -1
-        and last_brace != -1
-        and last_brace > first_brace
-    ):
-        candidate = cleaned[
-            first_brace:last_brace + 1
-        ].strip()
+    if start_index == -1:
+        return cleaned
 
-        try:
-            parsed = json.loads(candidate)
+    depth = 0
+    in_string = False
+    escaped = False
 
-            if isinstance(parsed, dict):
-                return candidate
+    for index in range(start_index, len(cleaned)):
 
-        except json.JSONDecodeError:
-            pass
+        char = cleaned[index]
 
-    # ------------------------------------------------------------------------
-    # Nothing worked.
-    # ------------------------------------------------------------------------
+        if in_string:
+
+            if escaped:
+                escaped = False
+
+            elif char == "\\":
+                escaped = True
+
+            elif char == '"':
+                in_string = False
+
+            continue
+
+        if char == '"':
+            in_string = True
+
+        elif char == "{":
+            depth += 1
+
+        elif char == "}":
+            depth -= 1
+
+            if depth == 0:
+                candidate = cleaned[
+                    start_index:index + 1
+                ].strip()
+
+                try:
+                    parsed = json.loads(candidate)
+
+                    if isinstance(parsed, dict):
+                        return candidate
+
+                except json.JSONDecodeError:
+                    return cleaned
 
     return cleaned
 
@@ -807,7 +872,7 @@ async def generate_json(
     """
     Generate and parse a JSON object using NVIDIA NIM.
 
-    This function is designed for Jobyn AI's structured tasks:
+    Designed for:
 
         - resume parsing
         - candidate profiles
@@ -815,11 +880,11 @@ async def generate_json(
         - job matching
         - application copilot
         - skill-gap analysis
-        - structured career coaching
+        - career coaching
 
-    Thinking is disabled by default because structured JSON generation is
-    more reliable when the model is instructed to return only the final
-    object.
+    Thinking is disabled by default because structured JSON generation
+    is generally more reliable when the model is instructed to return
+    only the final JSON object.
     """
 
     # ------------------------------------------------------------------------
@@ -845,12 +910,15 @@ Requirements:
     # System prompt
     # ------------------------------------------------------------------------
 
-    if system_prompt:
+    if system_prompt and system_prompt.strip():
+
         combined_system_prompt = (
             f"{system_prompt.strip()}\n\n"
             f"{json_instruction}"
         )
+
     else:
+
         combined_system_prompt = json_instruction
 
     # ------------------------------------------------------------------------
@@ -871,9 +939,7 @@ Requirements:
     # Clean response
     # ------------------------------------------------------------------------
 
-    cleaned = _extract_json_object(
-        content
-    )
+    cleaned = _extract_json_object(content)
 
     # ------------------------------------------------------------------------
     # Parse JSON
@@ -898,14 +964,11 @@ Requirements:
             "generate_json",
             type(exc).__name__,
             _sanitize_text(str(exc)),
-            _sanitize_text(cleaned),
+            _sanitize_text(cleaned[:500]),
         )
 
         raise LLMError(
-            (
-                "NVIDIA NIM returned invalid JSON. "
-                f"Response preview: {_sanitize_text(cleaned[:500])}"
-            )
+            "NVIDIA NIM returned invalid JSON."
         ) from exc
 
     # ------------------------------------------------------------------------
@@ -957,13 +1020,7 @@ def get_llm_config() -> dict[str, Any]:
     """
     Return safe LLM configuration information.
 
-    Never returns the API key.
-
-    Useful for:
-        /health
-        /debug
-        startup diagnostics
-        tests
+    The NVIDIA API key is never returned.
     """
 
     return {
@@ -977,17 +1034,42 @@ def get_llm_config() -> dict[str, Any]:
     }
 
 
-def reset_client() -> None:
+async def close_client() -> None:
     """
-    Reset the shared client.
+    Close the shared AsyncOpenAI client.
 
-    Primarily useful for tests.
-
-    The next call to generate_text() or generate_json() will recreate it.
+    Useful during application shutdown and tests.
     """
 
     global _client
 
+    if _client is not None:
+
+        try:
+            await _client.close()
+
+        except Exception:
+            logger.warning(
+                "Failed to close NVIDIA NIM client.",
+                exc_info=True,
+            )
+
+        finally:
+            _client = None
+
+
+def reset_client() -> None:
+    """
+    Reset the shared client reference.
+
+    Primarily useful for tests.
+
+    Note:
+        This function does not await client.close().
+        Use close_client() during application shutdown.
+    """
+
+    global _client
     _client = None
 
 
@@ -995,11 +1077,11 @@ def reset_client() -> None:
 # Public exports
 # ============================================================================
 
-
 __all__ = [
     "LLMError",
     "generate_text",
     "generate_json",
     "get_llm_config",
+    "close_client",
     "reset_client",
 ]
