@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import contextlib
+import os
 from pathlib import Path
 from typing import Any
 
@@ -32,6 +33,8 @@ async def _lifespan(app: FastAPI):
     database tables if they do not already exist.
 
     PostgreSQL schema management remains the responsibility of Alembic.
+    Curated demo jobs are seeded idempotently when the database is empty of
+    those records, unless ``JOBYN_SEED_DEMO_JOBS=false`` is configured.
     """
 
     from backend.core.config import get_settings
@@ -46,6 +49,18 @@ async def _lifespan(app: FastAPI):
 
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
+
+    if os.getenv("JOBYN_SEED_DEMO_JOBS", "true").strip().lower() not in {"0", "false", "no", "off"}:
+        from backend.database.session import async_session_maker
+        from backend.services.demo_seed import seed_demo_jobs
+
+        async with async_session_maker() as session:
+            try:
+                await seed_demo_jobs(session)
+            except Exception:
+                await session.rollback()
+                # Demo data must never prevent the API from starting. The
+                # normal jobs API remains available if seeding is unavailable.
 
     yield
 
