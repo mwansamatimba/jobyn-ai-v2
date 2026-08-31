@@ -7,7 +7,9 @@ by backend.api.deps.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Request, status
+from fastapi.exceptions import RequestValidationError
+from pydantic import ValidationError
 
 from backend.api.deps import get_auth_service, get_current_user
 from backend.models.user import User
@@ -42,13 +44,42 @@ async def register(
     summary="Authenticate and issue an access token",
 )
 async def login(
-    data: UserLogin,
+    request: Request,
     auth_service: AuthService = Depends(get_auth_service),
 ) -> TokenResponse:
-    """Authenticate credentials and return a JWT access token."""
+    """Authenticate JSON frontend credentials or OAuth2 password-form credentials.
+
+    The frontend sends ``{"email": ..., "password": ...}`` as JSON, while
+    Swagger's OAuth2 password flow sends ``username=...&password=...`` as
+    ``application/x-www-form-urlencoded``. Both representations are accepted
+    at this single endpoint so the existing authentication implementation and
+    JWT/token validation remain unchanged.
+    """
+
+    content_type = request.headers.get("content-type", "").split(";", 1)[0].strip().lower()
+
+    if content_type == "application/x-www-form-urlencoded":
+        form = await request.form()
+        data = UserLogin.model_validate(
+            {
+                "email": form.get("username"),
+                "password": form.get("password"),
+            }
+        )
+    else:
+        try:
+            payload = await request.json()
+        except ValueError as exc:
+            raise RequestValidationError(
+                [{"type": "json_invalid", "loc": ("body",), "msg": "Invalid JSON", "input": None}]
+            ) from exc
+        try:
+            data = UserLogin.model_validate(payload)
+        except ValidationError as exc:
+            raise RequestValidationError(exc.errors()) from exc
 
     user = await auth_service.authenticate_user(
-        email=data.email,
+        email=str(data.email),
         password=data.password,
     )
 
