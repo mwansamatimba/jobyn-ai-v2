@@ -183,3 +183,4 @@ celerybeat.pid
 *.lz
 *.lzma
 *.iso
+.env
