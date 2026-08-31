@@ -8,9 +8,11 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
 from backend.api.router import api_router
+from backend.core.config import settings
 from backend.core.errors import register_exception_handlers
 
 
@@ -77,6 +79,22 @@ def create_app() -> FastAPI:
         description="AI-powered career intelligence platform",
         version="2.0.0",
         lifespan=_lifespan,
+    )
+
+    allowed_origins = list(settings.BACKEND_CORS_ORIGINS)
+    production_frontend_origin = (
+        "https://jobyn-landing-page.tutorstores.workers.dev"
+    )
+
+    if production_frontend_origin not in allowed_origins:
+        allowed_origins.append(production_frontend_origin)
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=allowed_origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
     )
 
     # -----------------------------------------------------------------------
