@@ -42,6 +42,36 @@ def test_register_login_me_flow(client: TestClient) -> None:
     assert me.json()["email"] == "user@example.com"
 
 
+def test_login_accepts_oauth2_password_form(client: TestClient) -> None:
+    """Swagger's OAuth2 password flow can authenticate with username/password."""
+    assert client.post(
+        REGISTER_URL,
+        json={"email": "oauth@example.com", "password": "supersecret1"},
+    ).status_code == 201
+
+    response = client.post(
+        LOGIN_URL,
+        data={
+            "grant_type": "password",
+            "username": "oauth@example.com",
+            "password": "supersecret1",
+            "scope": "",
+            "client_id": "",
+            "client_secret": "",
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["token_type"] == "bearer"
+    assert body["access_token"]
+    assert body["expires_in"] > 0
+
+    me = client.get(ME_URL, headers=_auth_header(body["access_token"]))
+    assert me.status_code == 200
+    assert me.json()["email"] == "oauth@example.com"
+
+
 def test_register_rejects_duplicate_email(client: TestClient) -> None:
     payload = {"email": "dup@example.com", "password": "supersecret1"}
     assert client.post(REGISTER_URL, json=payload).status_code == 201
@@ -91,7 +121,6 @@ def test_registration_persists_user(client: TestClient) -> None:
     }
     assert client.post(REGISTER_URL, json=payload).status_code == 201
 
-    # A fresh login request uses a new session — proves the row was committed.
     login = client.post(
         LOGIN_URL,
         json={"email": "persist@example.com", "password": "supersecret1"},
@@ -127,7 +156,6 @@ def test_failed_registration_does_not_persist(client: TestClient) -> None:
     )
     assert bad.status_code == 422
 
-    # The address should now be available for a valid registration.
     ok = client.post(
         REGISTER_URL,
         json={"email": "rollback@example.com", "password": "supersecret1"},
