@@ -1,31 +1,41 @@
 """Focused tests for the experimental Firebase authentication compatibility layer."""
 
+import base64
+import json
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
-import jwt
 import pytest
 
+from backend.api import deps
 from backend.auth.firebase import FirebaseTokenError
 from backend.auth.jwt import InvalidTokenError
-from backend.api import deps
 
 
 def _jwt_with_algorithm(algorithm: str) -> str:
     """Create a structurally valid JWT header without requiring a signing key."""
-    return jwt.encode({"sub": "ignored"}, key="test-secret", algorithm=algorithm)
+    header = base64.urlsafe_b64encode(
+        json.dumps({"alg": algorithm, "typ": "JWT"}).encode()
+    ).rstrip(b"=").decode()
+    payload = base64.urlsafe_b64encode(
+        json.dumps({"sub": "ignored"}).encode()
+    ).rstrip(b"=").decode()
+    return f"{header}.{payload}.test-signature"
 
 
 @pytest.mark.asyncio
 async def test_valid_firebase_token_maps_by_verified_email(monkeypatch: pytest.MonkeyPatch) -> None:
     user = SimpleNamespace(id="jobyn-user", is_active=True)
     repository = SimpleNamespace(get_by_email=AsyncMock(return_value=user))
-    verify = lambda token: {  # noqa: E731
-        "uid": "firebase-uid",
-        "email": "User@Example.com",
-        "email_verified": True,
-    }
-    monkeypatch.setattr(deps, "verify_firebase_id_token", verify)
+    monkeypatch.setattr(
+        deps,
+        "verify_firebase_id_token",
+        lambda token: {
+            "uid": "firebase-uid",
+            "email": "User@Example.com",
+            "email_verified": True,
+        },
+    )
 
     result = await deps.get_current_user(_jwt_with_algorithm("RS256"), repository)
 
@@ -39,9 +49,11 @@ async def test_invalid_firebase_token_never_falls_back_to_jobyn_jwt(
 ) -> None:
     repository = SimpleNamespace(get_by_email=AsyncMock())
     fallback = lambda token: pytest.fail("Jobyn JWT verifier must not receive an RS256 token")
-    monkeypatch.setattr(deps, "verify_firebase_id_token", lambda token: (_ for _ in ()).throw(
-        FirebaseTokenError("expired")
-    ))
+    monkeypatch.setattr(
+        deps,
+        "verify_firebase_id_token",
+        lambda token: (_ for _ in ()).throw(FirebaseTokenError("invalid")),
+    )
     monkeypatch.setattr(deps, "verify_token", fallback)
 
     with pytest.raises(InvalidTokenError):
@@ -109,14 +121,13 @@ async def test_existing_jobyn_hs256_token_still_uses_original_path(
         "verify_token",
         lambda token: {"sub": "550e8400-e29b-41d4-a716-446655440000"},
     )
-    firebase_verify = AsyncMock()
+    firebase_verify = lambda token: pytest.fail("Firebase verifier must not receive an HS256 token")
     monkeypatch.setattr(deps, "verify_firebase_id_token", firebase_verify)
 
     result = await deps.get_current_user(_jwt_with_algorithm("HS256"), repository)
 
     assert result is user
     repository.get.assert_awaited_once()
-    firebase_verify.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -129,6 +140,5 @@ async def test_unsupported_algorithm_is_rejected_without_verifier_fallback(
     monkeypatch.setattr(deps, "verify_token", jobyn_verify)
     monkeypatch.setattr(deps, "verify_firebase_id_token", firebase_verify)
 
-    token = _jwt_with_algorithm("none")
     with pytest.raises(InvalidTokenError):
-        await deps.get_current_user(token, repository)
+        await deps.get_current_user(_jwt_with_algorithm("none"), repository)
