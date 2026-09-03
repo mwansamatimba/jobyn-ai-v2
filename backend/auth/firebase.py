@@ -10,6 +10,9 @@ import firebase_admin
 from firebase_admin import auth, credentials
 
 
+_FIREBASE_APP_NAME = "jobyn-firebase-auth"
+
+
 class FirebaseConfigurationError(RuntimeError):
     """Raised when Firebase Admin credentials are not configured."""
 
@@ -44,9 +47,13 @@ def _get_app() -> firebase_admin.App:
     }
 
     try:
-        return firebase_admin.get_app()
+        return firebase_admin.get_app(_FIREBASE_APP_NAME)
     except ValueError:
-        return firebase_admin.initialize_app(credentials.Certificate(service_account))
+        return firebase_admin.initialize_app(
+            credentials.Certificate(service_account),
+            {"projectId": project_id},
+            name=_FIREBASE_APP_NAME,
+        )
 
 
 def verify_firebase_id_token(token: str) -> dict[str, Any]:
