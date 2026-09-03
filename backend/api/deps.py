@@ -6,13 +6,18 @@ repositories, authentication services, and authenticated users.
 
 from __future__ import annotations
 
+import secrets
 import uuid
 from collections.abc import AsyncGenerator
 
+import bcrypt
+import jwt
 from fastapi import Depends
 from fastapi.security import OAuth2PasswordBearer
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.auth.firebase import FirebaseTokenError, verify_firebase_id_token
 from backend.auth.jwt import InvalidTokenError, verify_token
 from backend.database.session import async_session_maker
 from backend.models.user import User
@@ -62,22 +67,95 @@ async def get_auth_service(
     return AuthService(repository)
 
 
+def _credential_algorithm(token: str) -> str:
+    """Read the JWT algorithm only to select the authoritative verifier.
+
+    This header is never treated as proof of identity. Firebase ID tokens are
+    RS256-signed, while Jobyn's existing tokens are HS256-signed. Each selected
+    verifier still performs complete cryptographic and claim validation.
+    """
+
+    try:
+        return str(jwt.get_unverified_header(token).get("alg", ""))
+    except jwt.PyJWTError as exc:
+        raise InvalidTokenError() from exc
+
+
+async def _get_firebase_user(
+    token: str,
+    repository: UserRepository,
+) -> User:
+    """Verify Firebase credentials and resolve/provision the Jobyn user."""
+
+    try:
+        claims = verify_firebase_id_token(token)
+    except FirebaseTokenError as exc:
+        # An RS256 bearer credential is treated as Firebase-shaped and is never
+        # reinterpreted as a Jobyn JWT after Firebase verification fails.
+        raise InvalidTokenError() from exc
+
+    email = claims.get("email")
+    if not isinstance(email, str) or not email.strip():
+        raise InvalidTokenError("Firebase account does not contain an email address.")
+
+    normalized_email = email.strip().lower()
+    user = await repository.get_by_email(normalized_email)
+
+    if user is None:
+        random_password = secrets.token_urlsafe(48)
+        unusable_password_hash = bcrypt.hashpw(
+            random_password.encode("utf-8"),
+            bcrypt.gensalt(),
+        ).decode("utf-8")
+        full_name = claims.get("name")
+        user = await repository.create(
+            email=normalized_email,
+            hashed_password=unusable_password_hash,
+            full_name=full_name if isinstance(full_name, str) else None,
+            is_verified=bool(claims.get("email_verified", False)),
+        )
+        try:
+            await repository.session.commit()
+        except IntegrityError as exc:
+            await repository.session.rollback()
+            # A concurrent Firebase request may have provisioned the same email.
+            user = await repository.get_by_email(normalized_email)
+            if user is None:
+                raise InvalidTokenError() from exc
+
+    if not user.is_active:
+        raise InvalidTokenError("This account is disabled.")
+
+    return user
+
+
 async def get_current_user(
     token: str = Depends(oauth2_scheme),
     repository: UserRepository = Depends(get_user_repository),
 ) -> User:
-    """Resolve the authenticated user from a JWT bearer token."""
+    """Resolve an authenticated user from Firebase or the existing Jobyn JWT.
 
-    payload = verify_token(token)
+    Firebase-shaped RS256 credentials are verified exclusively by the Firebase
+    Admin SDK. Existing HS256 Jobyn credentials continue through the original
+    ``verify_token`` → UUID subject → repository primary-key lookup path.
+    """
 
-    try:
-        subject = uuid.UUID(payload["sub"])
-    except (KeyError, TypeError, ValueError) as exc:
-        raise InvalidTokenError() from exc
+    algorithm = _credential_algorithm(token)
 
-    user = await repository.get(subject)
+    if algorithm == "RS256":
+        return await _get_firebase_user(token, repository)
 
-    if user is None:
-        raise InvalidTokenError()
+    if algorithm == "HS256":
+        payload = verify_token(token)
+        try:
+            subject = uuid.UUID(payload["sub"])
+        except (KeyError, TypeError, ValueError) as exc:
+            raise InvalidTokenError() from exc
 
-    return user
+        user = await repository.get(subject)
+        if user is None:
+            raise InvalidTokenError()
+        return user
+
+    # Do not try a different verifier for an unsupported JWT algorithm.
+    raise InvalidTokenError()
