@@ -10,6 +10,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 Environment = Literal["development", "test", "staging", "production"]
 
+# Supported LLM provider identifiers used by LLM_PROVIDER.
+LLMProviderName = Literal["freellmapi", "nvidia"]
+
 
 class Settings(BaseSettings):
     """
@@ -78,7 +81,88 @@ class Settings(BaseSettings):
     # CORS
     # ------------------------------------------------------------------
 
-    BACKEND_CORS_ORIGINS: list[str] = Field(default_factory=list)
+    BACKEND_CORS_ORIGINS: str | list[str] = Field(default_factory=list)
+
+    # ------------------------------------------------------------------
+    # LLM provider selection
+    # ------------------------------------------------------------------
+    #
+    # LLM_PROVIDER controls which provider handles core AI workloads
+    # (CV analysis, job matching, career navigation, interview coaching,
+    # candidate profiles).  Cover-letter generation is unaffected — it
+    # always uses TaBiAI/Claude independently.
+    #
+    # Supported values:
+    #   freellmapi  — route through FreeLLMAPI (EXPERIMENTAL/demo only).
+    #                 Requires FREELLMAPI_BASE_URL and FREELLMAPI_API_KEY.
+    #   nvidia      — call NVIDIA NIM directly (existing behaviour).
+    #
+    # Default: "nvidia" — existing deployments are unaffected unless this
+    # variable is explicitly set to "freellmapi".
+    LLM_PROVIDER: LLMProviderName = "nvidia"
+
+    # ------------------------------------------------------------------
+    # FreeLLMAPI  (EXPERIMENTAL — demo / development only)
+    # ------------------------------------------------------------------
+    #
+    # IMPORTANT:
+    # FreeLLMAPI routes prompts to upstream free-tier providers (Groq,
+    # Cerebras, Google AI Studio, NVIDIA, etc.).  Candidate CV text and
+    # other request payloads leave your infrastructure and are subject to
+    # each upstream provider's own data-retention policies.
+    # Do NOT use with real user data in production.
+    # Reference: https://github.com/tashfeenahmed/freellmapi#disclaimer
+    #
+    # FREELLMAPI_BASE_URL — Base URL of your self-hosted FreeLLMAPI
+    #                       instance, e.g. http://localhost:3001/v1
+    #                       Required when LLM_PROVIDER=freellmapi.
+    #
+    # FREELLMAPI_API_KEY  — The unified bearer token from the FreeLLMAPI
+    #                       dashboard (format: freellmapi-…).
+    #                       Required when LLM_PROVIDER=freellmapi.
+    #                       NEVER commit this value.
+    #
+    # FREELLMAPI_MODEL    — Routing strategy / model identifier passed as
+    #                       the OpenAI "model" field.
+    #                       "auto"       — FreeLLMAPI picks the best
+    #                                      available provider (default).
+    #                       "auto:fast"  — optimise for latency.
+    #                       "auto:smart" — optimise for capability.
+    #                       Or any specific model id from the catalog at
+    #                       https://freellmapi.co/models
+    FREELLMAPI_BASE_URL: str | None = None
+    FREELLMAPI_API_KEY: str | None = None
+    FREELLMAPI_MODEL: str = "auto"
+
+    # ------------------------------------------------------------------
+    # NVIDIA NIM (existing provider — retained for rollback)
+    # ------------------------------------------------------------------
+    #
+    # Used when LLM_PROVIDER=nvidia.  These variables are read directly
+    # by backend/ai/llm.py via os.getenv() (historic behaviour retained).
+    #
+    # NVIDIA_API_KEY         — NVIDIA NIM API key.
+    # NVIDIA_BASE_URL        — https://integrate.api.nvidia.com/v1
+    # NVIDIA_MODEL           — nvidia/nemotron-3.5-lightning-30b-a3b
+    # NVIDIA_ENABLE_THINKING — true/false  (Nemotron-specific)
+    # NVIDIA_REASONING_BUDGET — reasoning token budget for thinking mode
+    # NVIDIA_TOP_P           — nucleus sampling (default 0.95)
+
+    # ------------------------------------------------------------------
+    # TaBiAI / Claude cover-letter provider (unchanged)
+    # ------------------------------------------------------------------
+    #
+    # Cover-letter generation always uses TaBiAI/Claude regardless of
+    # LLM_PROVIDER.  These variables are read via settings attributes.
+    #
+    # TABITOKEN_API_KEY            — TaBiAI bearer token.
+    # TABITOKEN_BASE_URL           — https://tabitoken.com/v1
+    # TABITOKEN_COVER_LETTER_MODEL — claude-opus-5
+    # TABITOKEN_TIMEOUT_SECONDS    — per-request timeout (default 60)
+
+    # ------------------------------------------------------------------
+    # Validators
+    # ------------------------------------------------------------------
 
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
     @classmethod
@@ -94,7 +178,6 @@ class Settings(BaseSettings):
 
         Or a single origin.
         """
-
         if value is None:
             return []
 
@@ -127,6 +210,19 @@ class Settings(BaseSettings):
             ]
 
         return [str(value)]
+
+    @field_validator("LLM_PROVIDER", mode="before")
+    @classmethod
+    def normalize_llm_provider(cls, value: object) -> str:
+        """Normalise LLM_PROVIDER to lowercase and validate."""
+        if value is None:
+            return "nvidia"
+        normalised = str(value).strip().lower()
+        if normalised not in {"freellmapi", "nvidia"}:
+            raise ValueError(
+                f"LLM_PROVIDER must be 'freellmapi' or 'nvidia', got {value!r}"
+            )
+        return normalised
 
     @field_validator("ENVIRONMENT", mode="before")
     @classmethod
