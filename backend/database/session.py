@@ -20,7 +20,31 @@ from backend.core.config import get_settings
 
 settings = get_settings()
 
-DATABASE_URL = settings.DATABASE_URL
+
+def _normalize_async_database_url(url: str) -> str:
+    """Normalize PostgreSQL URLs to the asyncpg SQLAlchemy dialect.
+
+    SQLAlchemy's PostgreSQL dialect defaults to psycopg2 when no async driver
+    is named. Jobyn's application uses AsyncEngine throughout, so PostgreSQL
+    URLs must resolve to asyncpg. This also makes the deployment resilient to
+    hosting providers that expose a standard ``postgresql://`` connection URL.
+    SQLite URLs are left unchanged for tests and local development.
+    """
+    replacements = (
+        ("postgresql+psycopg2://", "postgresql+asyncpg://"),
+        ("postgresql+psycopg://", "postgresql+asyncpg://"),
+        ("postgresql://", "postgresql+asyncpg://"),
+        ("postgres://", "postgresql+asyncpg://"),
+    )
+
+    for prefix, async_prefix in replacements:
+        if url.startswith(prefix):
+            return async_prefix + url[len(prefix) :]
+
+    return url
+
+
+DATABASE_URL = _normalize_async_database_url(settings.DATABASE_URL)
 
 
 # ---------------------------------------------------------------------------
