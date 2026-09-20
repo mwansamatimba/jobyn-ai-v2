@@ -41,9 +41,17 @@ class JobCreate(BaseModel):
 
 
 class JobRead(ORMModel):
-    """Public representation of a job posting."""
+    """Public representation of a job posting.
 
-    model_config = ConfigDict(from_attributes=True)
+    ``posted_at`` is the ORM/DB column name.  ``alias="date_posted"`` causes:
+      - Pydantic v2 to expose ``date_posted`` in the OpenAPI/JSON schema.
+      - FastAPI (which serializes with ``by_alias=True``) to emit ``date_posted``
+        in HTTP responses.
+      - ``from_attributes=True`` to read the value from ``Job.posted_at``.
+      - ``populate_by_name=True`` allows both names during deserialization.
+    """
+
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
     id: uuid.UUID
     title: str
@@ -61,6 +69,25 @@ class JobRead(ORMModel):
     source: str
     external_url: str | None
     created_at: datetime
+
+    # ORM field name: posted_at  →  API/OpenAPI name: date_posted
+    posted_at: datetime | None = Field(
+        default=None,
+        alias="date_posted",
+        description="Date the job was originally posted at the source",
+    )
+
+    # Ingestion fields (null for internal/legacy jobs)
+    country: str | None = None
+    province: str | None = None
+    city: str | None = None
+    remote_eligibility: str | None = None
+    category: str | None = None
+    source_name: str | None = None
+    attribution: str | None = None
+    deadline: datetime | None = None
+    last_verified: datetime | None = None
+    ingestion_status: str | None = None
 
 
 # ------------------------------------------------------------------ #

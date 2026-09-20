@@ -118,6 +118,107 @@ class ApplicationStatus(StrEnum):
     WITHDRAWN = "withdrawn"
 
 
+# ---------------------------------------------------------------------------
+# Job ingestion enums
+# ---------------------------------------------------------------------------
+
+
+class IngestionStatus(StrEnum):
+    """Lifecycle of an ingested job posting.
+
+    active          — visible, verified, accepting applications
+    possibly_closed — disappeared from one complete successful sync
+    closed          — disappeared from two consecutive complete syncs,
+                      or explicitly closed by source
+    expired         — deadline has passed
+    removed         — source owner requested takedown
+    error           — persistent fetch/parse error, needs manual review
+    """
+
+    ACTIVE = "active"
+    POSSIBLY_CLOSED = "possibly_closed"
+    CLOSED = "closed"
+    EXPIRED = "expired"
+    REMOVED = "removed"
+    ERROR = "error"
+
+
+class RemoteEligibility(StrEnum):
+    """Zambia-aware remote work eligibility classification."""
+
+    NOT_REMOTE = "not_remote"
+    ZAMBIA_ELIGIBLE = "zambia_eligible"
+    AFRICA_ELIGIBLE = "africa_eligible"
+    GLOBAL = "global"
+    RESTRICTIONS_UNCLEAR = "restrictions_unclear"
+
+
+class JobCategory(StrEnum):
+    """Deterministic job category (keyword-based, no LLM)."""
+
+    ACCOUNTING_FINANCE = "accounting_finance"
+    ADMINISTRATION = "administration"
+    AGRICULTURE = "agriculture"
+    BUSINESS_MANAGEMENT = "business_management"
+    CUSTOMER_SERVICE = "customer_service"
+    EDUCATION = "education"
+    ENGINEERING = "engineering"
+    HEALTHCARE = "healthcare"
+    HUMAN_RESOURCES = "human_resources"
+    ICT_TECHNOLOGY = "ict_technology"
+    LEGAL = "legal"
+    MARKETING_COMMUNICATIONS = "marketing_communications"
+    NGO_DEVELOPMENT = "ngo_development"
+    PROJECT_MANAGEMENT = "project_management"
+    RESEARCH = "research"
+    SALES = "sales"
+    SECURITY = "security"
+    SKILLED_TRADES = "skilled_trades"
+    INTERNSHIPS_GRADUATE = "internships_graduate"
+    OTHER = "other"
+
+
+class SourceType(StrEnum):
+    """How a job source delivers its data."""
+
+    API = "api"
+    RSS = "rss"
+    JSON = "json"
+    XML = "xml"
+    CSV = "csv"
+    HTML = "html"
+    PDF = "pdf"
+    MANUAL = "manual"
+    ATS = "ats"
+
+
+class PermissionStatus(StrEnum):
+    """Legal/compliance status of an ingestion source.
+
+    A public URL is NOT automatic permission to republish content.
+    """
+
+    OFFICIAL_API = "official_api"       # Official public API — no key required
+    OFFICIAL_FEED = "official_feed"     # Official public RSS/JSON feed
+    PERMISSION_GRANTED = "permission_granted"   # Explicit written permission
+    PERMISSION_REQUIRED = "permission_required" # Unknown/pending — do not ingest
+    TERMS_UNCLEAR = "terms_unclear"             # ToS does not clearly permit
+    DO_NOT_INGEST = "do_not_ingest"             # Explicitly prohibited
+
+
+class ComplianceEventType(StrEnum):
+    """Types of compliance events recorded against a source or job."""
+
+    PERMISSION_GRANTED = "permission_granted"
+    PERMISSION_REVOKED = "permission_revoked"
+    TAKEDOWN_REQUESTED = "takedown_requested"
+    TAKEDOWN_COMPLETED = "takedown_completed"
+    TERMS_CHANGED = "terms_changed"
+    SOURCE_DISABLED = "source_disabled"
+    JOB_REMOVED = "job_removed"
+    MANUAL_REVIEW = "manual_review"
+
+
 def enum_column(enum_class: type[StrEnum]) -> Enum:
     """Return a portable, non-native SQLAlchemy Enum column type for a StrEnum.
 

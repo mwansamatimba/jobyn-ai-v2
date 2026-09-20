@@ -194,13 +194,20 @@ class JobDiscoveryService(BaseService[JobRepository]):
     async def get_job(self, job_id: uuid.UUID) -> Job | None:
         """Return a single active job by id, or None.
 
+        An inactive job (is_active=False, e.g. closed/expired/removed by the
+        ingestion lifecycle) is treated the same as a missing job so callers
+        receive a consistent 404 response.
+
         Args:
             job_id: The job's UUID.
 
         Returns:
             The :class:`Job` instance or ``None``.
         """
-        return await self.job_repository.get_by_id(job_id)
+        job = await self.job_repository.get_by_id(job_id)
+        if job is not None and not job.is_active:
+            return None
+        return job
 
     async def create_job(self, **values: Any) -> Job:
         """Create an internal job posting and commit.

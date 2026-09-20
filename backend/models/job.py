@@ -33,8 +33,11 @@ from backend.models.enums import (
     ApplicationStatus,
     EmploymentType,
     ExperienceLevel,
+    IngestionStatus,
+    JobCategory,
     JobSource,
     LocationType,
+    RemoteEligibility,
     enum_column,
 )
 from backend.models.mixins import (
@@ -44,6 +47,7 @@ from backend.models.mixins import (
 )
 
 if TYPE_CHECKING:
+    from backend.models.ingestion import JobIngestionSource
     from backend.models.resume import Resume
     from backend.models.user import User
 
@@ -104,6 +108,108 @@ class Job(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
         nullable=True,
     )
 
+    # ------------------------------------------------------------------
+    # Ingestion metadata (added by Job Ingestion Engine)
+    # ------------------------------------------------------------------
+    # These columns are NULL for internally-created jobs (source=INTERNAL)
+    # and populated by the ingestion pipeline for externally-sourced jobs.
+
+    canonical_key: Mapped[str | None] = mapped_column(
+        String(512),
+        nullable=True,
+        index=True,
+        comment="Stable deduplication key: sha256(source_name+external_id or application_url)",
+    )
+    external_id: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
+        comment="Original ID from the source ATS/API",
+    )
+    source_name: Mapped[str | None] = mapped_column(
+        String(100),
+        nullable=True,
+        index=True,
+        comment="Short source identifier, e.g. greenhouse, lever, reliefweb",
+    )
+    source_url: Mapped[str | None] = mapped_column(
+        String(1024),
+        nullable=True,
+        comment="URL of the original job posting page at the source",
+    )
+    attribution: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+        comment="Attribution / credit line required by the source",
+    )
+    country: Mapped[str | None] = mapped_column(
+        String(100),
+        nullable=True,
+        index=True,
+    )
+    province: Mapped[str | None] = mapped_column(
+        String(100),
+        nullable=True,
+        index=True,
+        comment="Administrative region / province, e.g. Lusaka Province",
+    )
+    city: Mapped[str | None] = mapped_column(
+        String(100),
+        nullable=True,
+        index=True,
+    )
+    remote_eligibility: Mapped[RemoteEligibility | None] = mapped_column(
+        enum_column(RemoteEligibility),
+        nullable=True,
+        index=True,
+    )
+    category: Mapped[JobCategory | None] = mapped_column(
+        enum_column(JobCategory),
+        nullable=True,
+        index=True,
+        comment="Deterministic keyword-based job category",
+    )
+    requirements: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+        comment="Requirements section separate from description, if provided",
+    )
+    deadline: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        index=True,
+        comment="Application deadline; distinct from expires_at (which is our internal expiry)",
+    )
+    ingestion_status: Mapped[IngestionStatus | None] = mapped_column(
+        enum_column(IngestionStatus),
+        nullable=True,
+        index=True,
+        server_default=IngestionStatus.ACTIVE.value,
+        comment="Lifecycle state managed by the ingestion engine",
+    )
+    first_seen: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        comment="When this job was first fetched from the source",
+    )
+    last_seen: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        index=True,
+        comment="Last time this job appeared in a successful source sync",
+    )
+    last_verified: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        comment="Last time the job was confirmed active at the source",
+    )
+    missed_syncs: Mapped[int] = mapped_column(
+        Integer,
+        default=0,
+        server_default=text("0"),
+        nullable=False,
+        comment="Consecutive successful syncs where this job was absent",
+    )
+
     created_by_user: Mapped[User | None] = orm_relationship(
         back_populates="created_jobs",
         foreign_keys=[created_by_user_id],
@@ -113,6 +219,10 @@ class Job(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
         cascade="all, delete-orphan",
     )
     applications: Mapped[list[Application]] = orm_relationship(
+        back_populates="job",
+        cascade="all, delete-orphan",
+    )
+    ingestion_sources: Mapped[list["JobIngestionSource"]] = orm_relationship(  # type: ignore[name-defined]
         back_populates="job",
         cascade="all, delete-orphan",
     )

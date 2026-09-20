@@ -123,15 +123,11 @@ async def run_async_migrations(
         ),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
-
-        # -------------------------------------------------------------------
-        # IMPORTANT:
-        # Supabase port 6543 uses PgBouncer transaction pooling.
-        # Disable asyncpg prepared statement caching.
-        # -------------------------------------------------------------------
-        connect_args={
-            "statement_cache_size": 0,
-        },
+        # Disable asyncpg prepared-statement caching for Supabase PgBouncer.
+        # Only applied for PostgreSQL — aiosqlite does not support this arg.
+        **({
+            "connect_args": {"statement_cache_size": 0},
+        } if not config.get_main_option("sqlalchemy.url", "").startswith("sqlite") else {}),
     )
 
     try:

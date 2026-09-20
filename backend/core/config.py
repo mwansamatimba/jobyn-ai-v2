@@ -161,6 +161,36 @@ class Settings(BaseSettings):
     # TABITOKEN_TIMEOUT_SECONDS    — per-request timeout (default 60)
 
     # ------------------------------------------------------------------
+    # Job Ingestion Engine
+    # ------------------------------------------------------------------
+
+    JOB_INGESTION_ENABLED: bool = True
+
+    # Greenhouse — comma-separated board slugs, e.g. "stripe,shopify"
+    GREENHOUSE_ENABLED: bool = True
+    GREENHOUSE_BOARDS: str = ""   # empty = no boards configured
+
+    # Lever — comma-separated company slugs, e.g. "netflix,airbnb"
+    LEVER_ENABLED: bool = True
+    LEVER_BOARDS: str = ""
+
+    # Ashby — comma-separated org slugs
+    ASHBY_ENABLED: bool = True
+    ASHBY_BOARDS: str = ""
+
+    # ReliefWeb — always uses the public API; no key needed
+    RELIEFWEB_ENABLED: bool = True
+
+    # UN Careers — official RSS feed
+    UN_CAREERS_ENABLED: bool = True
+
+    # HTTP client settings for the ingestion engine
+    INGESTION_REQUEST_TIMEOUT: float = 30.0
+    INGESTION_MAX_RETRIES: int = 3
+    INGESTION_USER_AGENT: str = "Jobyn-AI-Ingestion/2.0 (+https://jobyn.ai)"
+    INGESTION_OBSERVATION_RETENTION_DAYS: int = 90
+
+    # ------------------------------------------------------------------
     # Validators
     # ------------------------------------------------------------------
 
