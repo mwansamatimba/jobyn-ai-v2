@@ -2,15 +2,30 @@
 
 from __future__ import annotations
 
-import uuid
+import asyncio
 
+import pytest
 from fastapi.testclient import TestClient
+
+from backend.database.base import Base
+from backend.database.session import engine
 
 from backend.core.config import get_settings
 
 REGISTER = "/api/v1/auth/register"
 LOGIN = "/api/v1/auth/login"
 ADMINS = "/api/v1/admin/users"
+
+
+@pytest.fixture(autouse=True)
+def reset_database() -> None:
+    """Isolate each admin-account test from the session-scoped HTTP client DB."""
+    async def reset() -> None:
+        async with engine.begin() as connection:
+            await connection.run_sync(Base.metadata.drop_all)
+            await connection.run_sync(Base.metadata.create_all)
+
+    asyncio.run(reset())
 
 
 def _register(client: TestClient, email: str, password: str = "supersecret1") -> None:
@@ -216,9 +231,6 @@ def test_last_active_admin_cannot_be_deactivated(client: TestClient) -> None:
 
 def test_inactive_admin_cannot_login(client: TestClient) -> None:
     token = _bootstrap(client, "task7-inactive-admin@example.com")
-    me = client.get("/api/v1/auth/me", headers=_auth(token))
-    target_id = me.json()["id"]
-
     # Keep the bootstrap admin active while making a second admin inactive.
     created = client.post(
         ADMINS,
@@ -252,7 +264,7 @@ def test_admin_detail_is_not_available_for_normal_user(client: TestClient) -> No
         headers=_auth(admin_token),
         json={"email": "task7-detail-target@example.com", "password": "created-secret1"},
     )
-    target_id = uuid.UUID(created.json()["id"])
+    target_id = created.json()["id"]
     _register(client, "task7-detail-normal@example.com")
     normal_token = _login(client, "task7-detail-normal@example.com")
 
