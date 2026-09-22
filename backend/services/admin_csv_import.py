@@ -12,7 +12,7 @@ import io
 import json
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import UploadFile
@@ -505,7 +505,7 @@ def _parse_datetime(raw: str | None, field_name: str) -> datetime | None:
     except ValueError as exc:
         raise ValueError(f"invalid {field_name}: expected ISO-8601 date/datetime.") from exc
     if value.tzinfo is None:
-        value = value.replace(tzinfo=timezone.utc)
+        value = value.replace(tzinfo=UTC)
     return value
 
 
