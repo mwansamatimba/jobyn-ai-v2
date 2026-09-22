@@ -8,8 +8,6 @@ ComplianceEvent audit trail.
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime
-
 from fastapi import HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
