@@ -84,8 +84,10 @@ async def get_current_user(
 
     return user
 
+
 async def require_admin(
     current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
 ) -> User:
     """Require the authenticated user's email to be in ADMIN_EMAILS."""
     from fastapi import HTTPException, status
