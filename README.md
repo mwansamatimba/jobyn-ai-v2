@@ -310,3 +310,16 @@ migration (`alembic/versions/`). Follow the same steps for each new feature:
    `backend/api/v1/router.py`.
 8. Move heavy AI work into a task in `backend/workers/`.
 9. Generate and review an Alembic migration.
+
+
+## Admin CSV job import
+
+The built-in admin page is available at `/admin`. The page has a login form, but all CSV actions are protected server-side by the `ADMIN_EMAILS` environment allowlist. Set `ADMIN_EMAILS` to a comma-separated list of administrator email addresses; an empty value grants no administrator access.
+
+The importer uses the existing `Job` model and ingestion deduplication path. It accepts UTF-8 CSV files up to 5 MiB and 1,000 rows. Preview happens before import; invalid rows are reported and are never inserted. Re-importing the same source/external ID or application URL is reported as a duplicate rather than silently overwriting an existing job. Imported provenance uses `source_name=admin_csv` and the existing ingestion-source/audit records.
+
+Supported columns:
+
+`title`, `company` (or `company_name`), `description`, `requirements`, `location`, `province`, `country`, `employment_type`, `experience_level`, `category`, `remote_eligibility`, `date_posted` (or `posted_at`), `deadline`, `external_url` (or `application_url`), `source`, `external_id`, `source_url`, `attribution`.
+
+Required columns are `title`, `company`, and a valid HTTP(S) `external_url`/ `application_url`. Dates use ISO-8601 format, for example `2026-09-22` or `2026-09-22T12:00:00+00:00`. Employment type, experience level, category, remote eligibility, and source values must match the existing application enum values (enum names are also accepted case-insensitively).
