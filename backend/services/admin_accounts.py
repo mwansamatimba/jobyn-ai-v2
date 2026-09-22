@@ -178,7 +178,10 @@ class AdminAccountService:
             if target.is_active and active_admins <= 1:
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
-                    detail="The last active administrator cannot be deactivated or lose administrator privileges.",
+                    detail=(
+                        "The last active administrator cannot be deactivated "
+                        "or lose administrator privileges."
+                    ),
                 )
 
         if data.is_active is not None:
@@ -196,9 +199,7 @@ class AdminAccountService:
 
         if data.role == ADMIN_ROLE and target.is_active:
             action = "ADMIN_ACTIVATED" if changes.get("is_active") is True else "ADMIN_UPDATED"
-        elif data.is_active is False:
-            action = "ADMIN_DEACTIVATED"
-        elif data.role == USER_ROLE:
+        elif data.is_active is False or data.role == USER_ROLE:
             action = "ADMIN_DEACTIVATED"
         else:
             action = "ADMIN_UPDATED"
@@ -246,4 +247,4 @@ class AdminAccountService:
         return user
 
 
-__all__ = ["AdminAccountService", "ADMIN_ROLE", "USER_ROLE"]
+__all__ = ["ADMIN_ROLE", "USER_ROLE", "AdminAccountService"]
