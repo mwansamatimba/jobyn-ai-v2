@@ -109,7 +109,7 @@ class CSVImportService:
             raise CSVImportError("CSV must be valid UTF-8.") from exc
 
         try:
-            reader = csv.DictReader(io.StringIO(text, newline=""))
+            reader = csv.DictReader(io.StringIO(text, newline=""), strict=True)
             raw_headers = reader.fieldnames
             if not raw_headers:
                 raise CSVImportError("CSV must contain a header row.")
