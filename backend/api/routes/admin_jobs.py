@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Annotated
+
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -40,7 +42,7 @@ async def _parse_upload(upload: UploadFile):
     summary="Validate and preview an administrator job CSV",
 )
 async def preview_job_csv(
-    file: UploadFile = File(...),
+    file: Annotated[UploadFile, File(...)],
     _: User = Depends(require_admin),
     session: AsyncSession = Depends(get_session),
 ) -> JobImportPreview:
