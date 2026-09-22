@@ -3,21 +3,27 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Jobyn Admin — CSV Job Import</title>
+  <title>Jobyn Admin</title>
   <style>
-    body{font-family:system-ui,sans-serif;max-width:900px;margin:40px auto;padding:0 20px;background:#f6f8f7;color:#17332d}
+    body{font-family:system-ui,sans-serif;max-width:1100px;margin:40px auto;padding:0 20px;background:#f6f8f7;color:#17332d}
     .card{background:#fff;border:1px solid #d8e1de;border-radius:12px;padding:24px;margin:16px 0}
-    input,button{font:inherit;padding:10px;border-radius:8px;border:1px solid #b8c8c3}
-    input{width:100%;box-sizing:border-box;margin:6px 0 12px}
-    button{cursor:pointer;background:#17332d;color:#fff;margin-right:8px}
+    input,select,button{font:inherit;padding:10px;border-radius:8px;border:1px solid #b8c8c3}
+    input,select{width:100%;box-sizing:border-box;margin:6px 0 12px}
+    button{cursor:pointer;background:#17332d;color:#fff;margin:4px 6px 4px 0}
     button.secondary{background:#fff;color:#17332d}
+    button.danger{background:#9b2525}
+    table{width:100%;border-collapse:collapse;margin-top:12px}
+    th,td{text-align:left;padding:10px;border-bottom:1px solid #e2e9e6;vertical-align:top}
+    .status{font-weight:600}.active{color:#176b45}.inactive{color:#9b2525}
     pre{white-space:pre-wrap;background:#f1f4f3;padding:12px;border-radius:8px}
     .hidden{display:none}.error{color:#9b2525}.ok{color:#176b45}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+    .actions{white-space:nowrap}
   </style>
 </head>
 <body>
   <h1>Jobyn Admin</h1>
-  <p>Administrator-only CSV vacancy import. Server-side authorization is enforced on every import endpoint.</p>
+  <p>Administrator-only management and CSV vacancy import. All data actions are server-authorized.</p>
 
   <section class="card" id="login-card">
     <h2>Admin login</h2>
@@ -27,43 +33,169 @@
     <p id="login-msg"></p>
   </section>
 
-  <section class="card hidden" id="import-card">
-    <h2>Import jobs</h2>
-    <p><button class="secondary" onclick="downloadTemplate()">Download CSV template</button></p>
-    <input id="csv" type="file" accept=".csv,text/csv">
-    <button onclick="preview()">Validate &amp; preview</button>
-    <button onclick="importJobs()">Confirm import</button>
-    <pre id="result">Choose a CSV file to begin.</pre>
-    <h3>Recent imports</h3>
-    <pre id="history">Loading…</pre>
-  </section>
+  <main id="dashboard" class="hidden">
+    <section class="card">
+      <div class="grid">
+        <div>
+          <h2>Signed in as</h2>
+          <strong id="current-name"></strong><br>
+          <span id="current-email"></span><br>
+          <span>Administrator</span>
+        </div>
+        <div>
+          <button class="secondary" onclick="logout()">Logout</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Admin Accounts</h2>
+      <p>Manage administrator access without editing environment variables or database records manually.</p>
+      <div class="grid">
+        <div>
+          <label>Full Name<input id="new-name" maxlength="255"></label>
+        </div>
+        <div>
+          <label>Email<input id="new-email" type="email" autocomplete="off"></label>
+        </div>
+        <div>
+          <label>Password<input id="new-password" type="password" autocomplete="new-password"></label>
+        </div>
+      </div>
+      <button onclick="createAdmin()">Create Administrator</button>
+      <p id="account-msg"></p>
+      <div id="admin-list">Loading…</div>
+    </section>
+
+    <section class="card">
+      <h2>Import jobs</h2>
+      <p><button class="secondary" onclick="downloadTemplate()">Download CSV template</button></p>
+      <input id="csv" type="file" accept=".csv,text/csv">
+      <button onclick="preview()">Validate &amp; preview</button>
+      <button onclick="importJobs()">Confirm import</button>
+      <pre id="result">Choose a CSV file to begin.</pre>
+      <h3>Recent imports</h3>
+      <pre id="history">Loading…</pre>
+    </section>
+  </main>
 
 <script>
 const tokenKey="jobyn.admin.access_token";
 const $=id=>document.getElementById(id);
-function headers(){return {"Authorization":"Bearer "+sessionStorage.getItem(tokenKey)}}
+function token(){return sessionStorage.getItem(tokenKey)}
+function headers(extra={}){return Object.assign({"Authorization":"Bearer "+token()},extra)}
+async function api(path,options={}) {
+  const r=await fetch(path,Object.assign({},options,{headers:Object.assign(headers(),options.headers||{})}));
+  const data=await r.json().catch(()=>null);
+  if(!r.ok) throw new Error((data&&data.detail)||("Request failed ("+r.status+")."));
+  return {response:r,data};
+}
 async function login(){
   $("login-msg").textContent="";
-  const r=await fetch("/api/v1/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:$("email").value,password:$("password").value})});
-  const data=await r.json().catch(()=>({}));
-  if(!r.ok){$("login-msg").className="error";$("login-msg").textContent=data.detail||"Login failed.";return}
-  sessionStorage.setItem(tokenKey,data.access_token);
-  const probe=await fetch("/api/v1/admin/jobs/import/history",{headers:headers()});
-  if(!probe.ok){sessionStorage.removeItem(tokenKey);$("login-msg").className="error";$("login-msg").textContent=probe.status===403?"This account is not an administrator.":"Administrator authorization failed.";return}
-  $("login-card").classList.add("hidden");$("import-card").classList.remove("hidden");$("history").textContent=JSON.stringify(await probe.json(),null,2);
+  try {
+    const r=await fetch("/api/v1/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:$("email").value,password:$("password").value})});
+    const data=await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(data.detail||"Login failed.");
+    sessionStorage.setItem(tokenKey,data.access_token);
+    await loadDashboard();
+  } catch(err) {
+    $("login-msg").className="error";
+    $("login-msg").textContent=err.message;
+  }
 }
+async function loadDashboard(){
+  try {
+    const me=(await api("/api/v1/auth/me")).data;
+    if(me.role!=="admin") throw new Error("This account is not an administrator.");
+    $("current-name").textContent=me.full_name||"Administrator";
+    $("current-email").textContent=me.email;
+    $("login-card").classList.add("hidden");
+    $("dashboard").classList.remove("hidden");
+    await Promise.all([loadAdmins(),refreshHistory()]);
+  } catch(err) {
+    sessionStorage.removeItem(tokenKey);
+    $("dashboard").classList.add("hidden");
+    $("login-card").classList.remove("hidden");
+    $("login-msg").className="error";
+    $("login-msg").textContent=err.message;
+  }
+}
+async function loadAdmins(){
+  const data=(await api("/api/v1/admin/users?offset=0&limit=100")).data;
+  const host=$("admin-list");
+  host.replaceChildren();
+  const table=document.createElement("table");
+  const head=document.createElement("thead");
+  head.innerHTML="<tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Created</th><th>Actions</th></tr>";
+  table.appendChild(head);
+  const body=document.createElement("tbody");
+  for(const admin of data.items){
+    const row=document.createElement("tr");
+    const cells=[admin.full_name||"—",admin.email,admin.role,admin.is_active?"Active":"Disabled",new Date(admin.created_at).toLocaleString()];
+    for(const value of cells){const td=document.createElement("td");td.textContent=value;row.appendChild(td)}
+    const actions=document.createElement("td");actions.className="actions";
+    const edit=document.createElement("button");edit.textContent="Edit";edit.onclick=()=>editAdmin(admin);
+    actions.appendChild(edit);
+    const toggle=document.createElement("button");toggle.textContent=admin.is_active?"Deactivate":"Activate";toggle.className=admin.is_active?"danger":"secondary";toggle.onclick=()=>toggleAdmin(admin);
+    actions.appendChild(toggle);
+    const password=document.createElement("button");password.textContent="Change Password";password.onclick=()=>changePassword(admin);
+    actions.appendChild(password);
+    row.appendChild(actions);body.appendChild(row);
+  }
+  table.appendChild(body);host.appendChild(table);
+  if(!data.items.length) host.textContent="No administrator accounts found.";
+}
+async function createAdmin(){
+  const msg=$("account-msg");msg.className="";msg.textContent="";
+  const password=$("new-password").value;
+  if(password!==password.trim() || password.length<8){msg.className="error";msg.textContent="Password must be at least 8 characters and contain no leading/trailing whitespace.";return}
+  try{
+    await api("/api/v1/admin/users",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({full_name:$("new-name").value,email:$("new-email").value,password})});
+    $("new-name").value="";$("new-email").value="";$("new-password").value="";
+    msg.className="ok";msg.textContent="Administrator created successfully.";
+    await loadAdmins();
+  }catch(err){msg.className="error";msg.textContent=err.message}
+}
+async function editAdmin(admin){
+  const name=prompt("Full name:",admin.full_name||"");
+  if(name===null)return;
+  const role=prompt("Role (admin or user):",admin.role);
+  if(role===null)return;
+  if(!["admin","user"].includes(role)){alert("Role must be admin or user.");return}
+  try{await api("/api/v1/admin/users/"+admin.id,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({full_name:name,role})});await loadAdmins()}catch(err){alert(err.message)}
+}
+async function toggleAdmin(admin){
+  const action=admin.is_active?"Deactivate":"Activate";
+  if(!confirm(action+" administrator?\n\n"+(admin.full_name||admin.email)))return;
+  try{await api("/api/v1/admin/users/"+admin.id,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({is_active:!admin.is_active})});await loadAdmins()}catch(err){alert(err.message)}
+}
+async function changePassword(admin){
+  const password=prompt("New password (minimum 8 characters):");
+  if(password===null)return;
+  if(password.length<8){alert("Password must be at least 8 characters.");return}
+  if(!confirm("Change the password for "+admin.email+"?"))return;
+  try{await api("/api/v1/admin/users/"+admin.id+"/password",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({password})});alert("Password changed successfully.")}catch(err){alert(err.message)}
+}
+function logout(){sessionStorage.removeItem(tokenKey);location.reload()}
 function file(){return $("csv").files[0]}
 async function send(path){
   const f=file();if(!f){$("result").textContent="Choose a CSV file first.";return}
   const form=new FormData();form.append("file",f);
-  const r=await fetch(path,{method:"POST",headers:headers(),body:form});
-  const data=await r.json().catch(()=>({detail:"Invalid server response"}));
-  $("result").textContent=JSON.stringify(data,null,2);
+  try{const data=(await api(path,{method:"POST",body:form})).data;$("result").textContent=JSON.stringify(data,null,2);await refreshHistory()}catch(err){$("result").textContent=err.message}
 }
-async function downloadTemplate(){const r=await fetch("/api/v1/admin/jobs/import/template",{headers:headers()});if(!r.ok){$("result").textContent="Template download failed ("+r.status+").";return}const blob=await r.blob();const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="jobyn-job-import-template.csv";a.click();URL.revokeObjectURL(a.href)}
+async function downloadTemplate(){
+  try{
+    const r=await fetch("/api/v1/admin/jobs/import/template",{headers:headers()});
+    if(!r.ok)throw new Error("Template download failed ("+r.status+").");
+    const blob=await r.blob();const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="jobyn-job-import-template.csv";a.click();URL.revokeObjectURL(a.href);
+  }catch(err){$("result").textContent=err.message}
+}
 async function preview(){await send("/api/v1/admin/jobs/import/preview")}
-async function importJobs(){await send("/api/v1/admin/jobs/import");await refreshHistory()}
-async function refreshHistory(){const r=await fetch("/api/v1/admin/jobs/import/history",{headers:headers()});if(r.ok)$("history").textContent=JSON.stringify(await r.json(),null,2)}
+async function importJobs(){await send("/api/v1/admin/jobs/import")}
+async function refreshHistory(){
+  try{$("history").textContent=JSON.stringify((await api("/api/v1/admin/jobs/import/history")).data,null,2)}catch(err){$("history").textContent=err.message}
+}
+if(token()) loadDashboard();
 </script>
 </body>
 </html>
