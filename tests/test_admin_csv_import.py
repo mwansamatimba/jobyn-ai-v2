@@ -242,7 +242,13 @@ def test_empty_and_non_csv_uploads_are_rejected(client, admin_token):
     assert empty.status_code == 400
     wrong = client.post(
         PREVIEW,
-        files={\n            "file": (\n                "jobs.txt",\n                b"title,company,external_url\\nA,B,https://example.com/a\\n",\n                "text/plain",\n            )\n        },
+        files={
+            "file": (
+                "jobs.txt",
+                b"title,company,external_url\\nA,B,https://example.com/a\\n",
+                "text/plain",
+            )
+        },
         headers=headers,
     )
     assert wrong.status_code == 400
@@ -275,7 +281,9 @@ def test_admin_page_and_date_posted_alias(client, admin_token):
         IMPORT, files={"file": ("alias.csv", body, "text/csv")}, headers=auth_header(admin_token)
     ).status_code == 200
     jobs = client.get(
-        "/api/v1/jobs",\n        params={"source": "admin_csv", "limit": 100},\n        headers=auth_header(admin_token),
+        "/api/v1/jobs",
+        params={"source": "admin_csv", "limit": 100},
+        headers=auth_header(admin_token),
     )
     item = next(
         job for job in jobs.json()["items"]
@@ -320,7 +328,9 @@ def test_same_external_id_from_other_source_does_not_merge(client, admin_token):
         async with async_session_factory() as session:
             source = IngestionSource(
                 id=uuid.uuid4(), name="greenhouse-isolation", organization_name="Greenhouse",
-                source_type=SourceType.API,\n                permission_status=PermissionStatus.OFFICIAL_API,\n                active=True,
+                source_type=SourceType.API,
+                permission_status=PermissionStatus.OFFICIAL_API,
+                active=True,
             )
             job = Job(
                 id=uuid.uuid4(), title="Greenhouse Job", company_name="Greenhouse Co",
