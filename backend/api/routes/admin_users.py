@@ -5,9 +5,6 @@ from __future__ import annotations
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, status
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from backend.api.deps import get_session, require_admin
 from backend.models.user import User
 from backend.schemas.admin_users import (
@@ -18,6 +15,9 @@ from backend.schemas.admin_users import (
     AdminPasswordChange,
 )
 from backend.services.admin_accounts import AdminAccountService
+
+from fastapi import APIRouter, Depends, Query, status
+from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/admin/users", tags=["Admin Accounts"])
 _service = AdminAccountService()
