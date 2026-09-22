@@ -7,10 +7,9 @@ import asyncio
 import pytest
 from fastapi.testclient import TestClient
 
+from backend.core.config import get_settings
 from backend.database.base import Base
 from backend.database.session import engine
-
-from backend.core.config import get_settings
 
 REGISTER = "/api/v1/auth/register"
 LOGIN = "/api/v1/auth/login"
