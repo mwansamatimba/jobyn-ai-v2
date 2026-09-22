@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Jobyn Admin — CSV Job Import</title>
+  <style>
+    body{font-family:system-ui,sans-serif;max-width:900px;margin:40px auto;padding:0 20px;background:#f6f8f7;color:#17332d}
+    .card{background:#fff;border:1px solid #d8e1de;border-radius:12px;padding:24px;margin:16px 0}
+    input,button{font:inherit;padding:10px;border-radius:8px;border:1px solid #b8c8c3}
+    input{width:100%;box-sizing:border-box;margin:6px 0 12px}
+    button{cursor:pointer;background:#17332d;color:#fff;margin-right:8px}
+    button.secondary{background:#fff;color:#17332d}
+    pre{white-space:pre-wrap;background:#f1f4f3;padding:12px;border-radius:8px}
+    .hidden{display:none}.error{color:#9b2525}.ok{color:#176b45}
+  </style>
+</head>
+<body>
+  <h1>Jobyn Admin</h1>
+  <p>Administrator-only CSV vacancy import. Server-side authorization is enforced on every import endpoint.</p>
+
+  <section class="card" id="login-card">
+    <h2>Admin login</h2>
+    <label>Email<input id="email" type="email" autocomplete="username"></label>
+    <label>Password<input id="password" type="password" autocomplete="current-password"></label>
+    <button onclick="login()">Sign in</button>
+    <p id="login-msg"></p>
+  </section>
+
+  <section class="card hidden" id="import-card">
+    <h2>Import jobs</h2>
+    <p><a href="/api/v1/admin/jobs/import/template" id="template-link">Download CSV template</a></p>
+    <input id="csv" type="file" accept=".csv,text/csv">
+    <button onclick="preview()">Validate &amp; preview</button>
+    <button onclick="importJobs()">Confirm import</button>
+    <pre id="result">Choose a CSV file to begin.</pre>
+    <h3>Recent imports</h3>
+    <pre id="history">Loading…</pre>
+  </section>
+
+<script>
+const tokenKey="jobyn.admin.access_token";
+const $=id=>document.getElementById(id);
+function headers(){return {"Authorization":"Bearer "+sessionStorage.getItem(tokenKey)}}
+async function login(){
+  $("login-msg").textContent="";
+  const r=await fetch("/api/v1/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:$("email").value,password:$("password").value})});
+  const data=await r.json().catch(()=>({}));
+  if(!r.ok){$("login-msg").className="error";$("login-msg").textContent=data.detail||"Login failed.";return}
+  sessionStorage.setItem(tokenKey,data.access_token);
+  const probe=await fetch("/api/v1/admin/jobs/import/history",{headers:headers()});
+  if(!probe.ok){sessionStorage.removeItem(tokenKey);$("login-msg").className="error";$("login-msg").textContent=probe.status===403?"This account is not an administrator.":"Administrator authorization failed.";return}
+  $("login-card").classList.add("hidden");$("import-card").classList.remove("hidden");$("history").textContent=JSON.stringify(await probe.json(),null,2);
+}
+function file(){return $("csv").files[0]}
+async function send(path){
+  const f=file();if(!f){$("result").textContent="Choose a CSV file first.";return}
+  const form=new FormData();form.append("file",f);
+  const r=await fetch(path,{method:"POST",headers:headers(),body:form});
+  const data=await r.json().catch(()=>({detail:"Invalid server response"}));
+  $("result").textContent=JSON.stringify(data,null,2);
+}
+async function preview(){await send("/api/v1/admin/jobs/import/preview")}
+async function importJobs(){await send("/api/v1/admin/jobs/import");await refreshHistory()}
+async function refreshHistory(){const r=await fetch("/api/v1/admin/jobs/import/history",{headers:headers()});if(r.ok)$("history").textContent=JSON.stringify(await r.json(),null,2)}
+</script>
+</body>
+</html>
