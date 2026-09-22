@@ -26,6 +26,7 @@ __all__ = [
     "get_user_repository",
     "get_auth_service",
     "get_current_user",
+    "require_admin",
 ]
 
 
@@ -81,3 +82,18 @@ async def get_current_user(
         raise InvalidTokenError()
 
     return user
+
+async def require_admin(
+    current_user: User = Depends(get_current_user),
+) -> User:
+    """Require the authenticated user's email to be in ADMIN_EMAILS."""
+    from fastapi import HTTPException, status
+    from backend.core.config import get_settings
+
+    allowed = {email.lower() for email in get_settings().ADMIN_EMAILS}
+    if current_user.email.lower() not in allowed:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Administrator access required.",
+        )
+    return current_user
