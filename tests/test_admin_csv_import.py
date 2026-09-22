@@ -90,18 +90,24 @@ def test_admin_preview_and_import(client, admin_token):
     body = csv_bytes([job_row()])
     headers = auth_header(admin_token)
 
-    preview = client.post(\n        PREVIEW, files={"file": ("vacancies.csv", body, "text/csv")}, headers=headers\n    )
+    preview = client.post(
+        PREVIEW, files={"file": ("vacancies.csv", body, "text/csv")}, headers=headers
+    )
     assert preview.status_code == 200
     assert preview.json()["total_rows"] == 1
     assert preview.json()["valid_rows"] == 1
     assert preview.json()["invalid_rows"] == 0
     assert preview.json()["ready_to_import"] == 1
 
-    imported = client.post(\n        IMPORT, files={"file": ("vacancies.csv", body, "text/csv")}, headers=headers\n    )
+    imported = client.post(
+        IMPORT, files={"file": ("vacancies.csv", body, "text/csv")}, headers=headers
+    )
     assert imported.status_code == 200
     assert imported.json()["rows_imported"] == 1
 
-    jobs = client.get(\n        "/api/v1/jobs", params={"source": "admin_csv", "limit": 100}, headers=headers\n    )
+    jobs = client.get(
+        "/api/v1/jobs", params={"source": "admin_csv", "limit": 100}, headers=headers
+    )
     assert jobs.status_code == 200
     job = next(item for item in jobs.json()["items"] if item["title"] == "CSV Software Engineer")
     assert job["source_name"] == "admin_csv"
@@ -112,7 +118,9 @@ def test_admin_preview_and_import(client, admin_token):
 def test_imported_job_flows_through_search_filters_and_detail(client, admin_token):
     headers = auth_header(admin_token)
     body = csv_bytes([job_row("csv-api-001", "https://example.com/jobs/csv-api-001")])
-    assert client.post(\n        IMPORT, files={"file": ("jobs.csv", body, "text/csv")}, headers=headers\n    ).status_code == 200
+    assert client.post(
+        IMPORT, files={"file": ("jobs.csv", body, "text/csv")}, headers=headers
+    ).status_code == 200
 
     search = client.get(
         "/api/v1/jobs/search",
@@ -145,7 +153,10 @@ def test_same_application_url_is_deduplicated(client, admin_token):
     headers = auth_header(admin_token)
     first = csv_bytes([job_row("url-a", "https://example.com/jobs/same?utm_source=test")])
     second = csv_bytes([job_row("url-b", "https://example.com/jobs/same")])
-    first_result = client.post(\n        IMPORT, files={"file": ("a.csv", first, "text/csv")}, headers=headers\n    )\n    assert first_result.json()["rows_imported"] == 1
+    first_result = client.post(
+        IMPORT, files={"file": ("a.csv", first, "text/csv")}, headers=headers
+    )
+    assert first_result.json()["rows_imported"] == 1
     result = client.post(IMPORT, files={"file": ("b.csv", second, "text/csv")}, headers=headers)
     assert result.json()["rows_imported"] == 0
     assert result.json()["rows_skipped_duplicates"] == 1
@@ -192,11 +203,15 @@ def test_mixed_valid_and_invalid_rows(client, admin_token):
     body = csv_bytes([good, bad])
     headers = auth_header(admin_token)
 
-    preview = client.post(\n        PREVIEW, files={"file": ("mixed.csv", body, "text/csv")}, headers=headers\n    )
+    preview = client.post(
+        PREVIEW, files={"file": ("mixed.csv", body, "text/csv")}, headers=headers
+    )
     assert preview.json()["valid_rows"] == 1
     assert preview.json()["invalid_rows"] == 1
 
-    imported = client.post(\n        IMPORT, files={"file": ("mixed.csv", body, "text/csv")}, headers=headers\n    )
+    imported = client.post(
+        IMPORT, files={"file": ("mixed.csv", body, "text/csv")}, headers=headers
+    )
     assert imported.json()["rows_imported"] == 1
     assert imported.json()["rows_rejected"] == 1
 
@@ -206,7 +221,9 @@ def test_utf8_extra_columns_and_blank_rows(client, admin_token):
     row["title"] = "Developer role - Lusaka"
     headers = list(row) + ["extra_column"]
     body = csv_bytes([row], headers)
-    response = client.post(\n        IMPORT, files={"file": ("utf8.csv", body, "text/csv")}, headers=auth_header(admin_token)\n    )
+    response = client.post(
+        IMPORT, files={"file": ("utf8.csv", body, "text/csv")}, headers=auth_header(admin_token)
+    )
     assert response.status_code == 200
     assert response.json()["rows_imported"] == 1
 
@@ -238,7 +255,9 @@ def test_template_and_history(client, admin_token):
     assert b"title,company" in template.content
 
     body = csv_bytes([job_row("history-001", "https://example.com/jobs/history-001")])
-    assert client.post(\n        IMPORT, files={"file": ("history.csv", body, "text/csv")}, headers=headers\n    ).status_code == 200
+    assert client.post(
+        IMPORT, files={"file": ("history.csv", body, "text/csv")}, headers=headers
+    ).status_code == 200
     history = client.get(HISTORY, headers=headers)
     assert history.status_code == 200
     item = next(row for row in history.json() if row["filename"] == "history.csv")
@@ -252,16 +271,25 @@ def test_admin_page_and_date_posted_alias(client, admin_token):
     assert b"Confirm import" in page.content
 
     body = csv_bytes([job_row("alias-001", "https://example.com/jobs/alias-001")])
-    assert client.post(\n        IMPORT, files={"file": ("alias.csv", body, "text/csv")}, headers=auth_header(admin_token)\n    ).status_code == 200
-    jobs = client.get(\n        "/api/v1/jobs", params={"source": "admin_csv", "limit": 100}, headers=auth_header(admin_token)\n    )
-    item = next(\n        job for job in jobs.json()["items"]\n        if job["external_url"] == "https://example.com/jobs/alias-001"\n    )
+    assert client.post(
+        IMPORT, files={"file": ("alias.csv", body, "text/csv")}, headers=auth_header(admin_token)
+    ).status_code == 200
+    jobs = client.get(
+        "/api/v1/jobs", params={"source": "admin_csv", "limit": 100}, headers=auth_header(admin_token)
+    )
+    item = next(
+        job for job in jobs.json()["items"]
+        if job["external_url"] == "https://example.com/jobs/alias-001"
+    )
     assert "date_posted" in item
     assert "posted_at" not in item
 
 
 def test_upload_size_limit(client, admin_token):
     body = b"title,company,external_url\nA,B,https://example.com/a\n" + b"x" * (5 * 1024 * 1024)
-    response = client.post(\n        PREVIEW, files={"file": ("large.csv", body, "text/csv")}, headers=auth_header(admin_token)\n    )
+    response = client.post(
+        PREVIEW, files={"file": ("large.csv", body, "text/csv")}, headers=auth_header(admin_token)
+    )
     assert response.status_code == 400
 
 
@@ -284,7 +312,9 @@ def test_same_external_id_from_other_source_does_not_merge(client, admin_token):
     from backend.models.job import Job
 
     external_id = "shared-source-id"
-    canonical = make_canonical_key(\n        "greenhouse", external_id, "https://greenhouse.example/jobs/shared"\n    )
+    canonical = make_canonical_key(
+        "greenhouse", external_id, "https://greenhouse.example/jobs/shared"
+    )
 
     async def seed():
         async with async_session_factory() as session:
@@ -294,7 +324,9 @@ def test_same_external_id_from_other_source_does_not_merge(client, admin_token):
             )
             job = Job(
                 id=uuid.uuid4(), title="Greenhouse Job", company_name="Greenhouse Co",
-                external_id=external_id,\n                source_name="greenhouse-isolation",\n                canonical_key=canonical,
+                external_id=external_id,
+                source_name="greenhouse-isolation",
+                canonical_key=canonical,
                 external_url="https://greenhouse.example/jobs/shared", source=JobSource.EXTERNAL,
                 is_active=True,
             )
@@ -308,7 +340,9 @@ def test_same_external_id_from_other_source_does_not_merge(client, admin_token):
 
     asyncio.run(seed())
     body = csv_bytes([job_row(external_id, "https://example.com/jobs/shared-admin")])
-    response = client.post(\n        IMPORT, files={"file": ("jobs.csv", body, "text/csv")}, headers=auth_header(admin_token)\n    )
+    response = client.post(
+        IMPORT, files={"file": ("jobs.csv", body, "text/csv")}, headers=auth_header(admin_token)
+    )
     assert response.status_code == 200
     assert response.json()["rows_imported"] == 1
 
@@ -324,7 +358,9 @@ def test_fatal_import_error_rolls_back_batch(client, admin_token, monkeypatch):
     monkeypatch.setattr("backend.services.admin_csv_import._process_job", fail)
     external_id = "rollback-001"
     body = csv_bytes([job_row(external_id, "https://example.com/jobs/rollback-001")])
-    response = client.post(\n        IMPORT, files={"file": ("rollback.csv", body, "text/csv")}, headers=auth_header(admin_token)\n    )
+    response = client.post(
+        IMPORT, files={"file": ("rollback.csv", body, "text/csv")}, headers=auth_header(admin_token)
+    )
     assert response.status_code == 500
 
     async def check():
