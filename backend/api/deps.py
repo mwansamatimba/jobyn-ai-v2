@@ -18,6 +18,7 @@ from backend.core.config import get_settings
 from backend.database.session import async_session_maker
 from backend.models.user import User
 from backend.repositories.user import UserRepository
+from backend.services.admin_accounts import AdminAccountService
 from backend.services.auth import AuthService
 
 
