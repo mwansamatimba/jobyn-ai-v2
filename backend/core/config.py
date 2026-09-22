@@ -57,6 +57,9 @@ class Settings(BaseSettings):
 
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
 
+    # Comma-separated administrator email addresses. Empty means no admin access.
+    ADMIN_EMAILS: str | list[str] = Field(default_factory=list)
+
     # ------------------------------------------------------------------
     # Database
     # ------------------------------------------------------------------
@@ -193,6 +196,15 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------
     # Validators
     # ------------------------------------------------------------------
+
+    @field_validator("ADMIN_EMAILS", mode="before")
+    @classmethod
+    def parse_admin_emails(cls, value: object) -> list[str]:
+        if value is None:
+            return []
+        if isinstance(value, list):
+            return [str(item).strip().lower() for item in value if str(item).strip()]
+        return [item.strip().lower() for item in str(value).split(",") if item.strip()]
 
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
     @classmethod

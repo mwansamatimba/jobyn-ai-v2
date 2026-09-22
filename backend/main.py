@@ -21,6 +21,7 @@ from backend.core.errors import register_exception_handlers
 # ---------------------------------------------------------------------------
 
 _DEMO_HTML = Path(__file__).parent / "demo.html"
+_ADMIN_HTML = Path(__file__).parent / "admin.html"
 
 
 # ---------------------------------------------------------------------------
@@ -138,6 +139,15 @@ def create_app() -> FastAPI:
             _DEMO_HTML,
             media_type="text/html",
         )
+
+    @app.get(
+        "/admin",
+        tags=["admin"],
+        include_in_schema=False,
+    )
+    async def admin_page():
+        """Serve the admin login/import shell; all data actions are server-authorized."""
+        return FileResponse(_ADMIN_HTML, media_type="text/html")
 
     # -----------------------------------------------------------------------
     # Health checks
