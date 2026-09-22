@@ -10,7 +10,6 @@ from backend.core.config import get_settings
 from backend.database.base import Base
 from backend.database.session import async_session_maker, engine
 from backend.models.ingestion import ComplianceEvent
-
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
