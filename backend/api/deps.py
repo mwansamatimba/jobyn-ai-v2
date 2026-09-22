@@ -9,7 +9,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import AsyncGenerator
 
-from fastapi import Depends
+from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -90,13 +90,24 @@ async def require_admin(
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> User:
-    """Require the authenticated user's email to be in ADMIN_EMAILS."""
-    from fastapi import HTTPException, status
-
-    allowed = {email.lower() for email in get_settings().ADMIN_EMAILS}
-    if current_user.email.lower() not in allowed:
+    """Require an active administrator, preserving ADMIN_EMAILS as bootstrap."""
+    if not current_user.is_active:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Administrator access required.",
+            detail="Administrator account is inactive.",
         )
-    return current_user
+
+    if current_user.role == "admin":
+        return current_user
+
+    allowed = {email.lower() for email in get_settings().ADMIN_EMAILS}
+    if current_user.email.lower() in allowed:
+        return await AdminAccountService().bootstrap_admin(
+            session,
+            user=current_user,
+        )
+
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Administrator access required.",
+    )
