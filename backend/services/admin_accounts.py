@@ -8,6 +8,11 @@ ComplianceEvent audit trail.
 from __future__ import annotations
 
 import json
+from fastapi import HTTPException, status
+from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from backend.auth.password import hash_password
 from backend.models.enums import ComplianceEventType
 from backend.models.ingestion import ComplianceEvent
@@ -19,10 +24,6 @@ from backend.schemas.admin_users import (
     AdminAccountUpdate,
     AdminPasswordChange,
 )
-from fastapi import HTTPException, status
-from sqlalchemy import func, select
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import AsyncSession
 
 ADMIN_ROLE = "admin"
 USER_ROLE = "user"
