@@ -5,9 +5,14 @@ from __future__ import annotations
 import asyncio
 import csv
 import io
+import uuid
 
 import pytest
-
+from backend.database.session import async_session_factory
+from backend.ingestion.dedup import make_canonical_key
+from backend.models.enums import JobSource, PermissionStatus, SourceType
+from backend.models.ingestion import IngestionSource, JobIngestionSource
+from backend.models.job import Job
 from backend.core.config import settings
 
 REGISTER = "/api/v1/auth/register"
@@ -313,13 +318,6 @@ def test_row_limit(client, admin_token):
 
 
 def test_same_external_id_from_other_source_does_not_merge(client, admin_token):
-    import asyncio
-    import uuid
-    from backend.database.session import async_session_factory
-    from backend.ingestion.dedup import make_canonical_key
-    from backend.models.enums import JobSource, PermissionStatus, SourceType
-    from backend.models.ingestion import IngestionSource, JobIngestionSource
-    from backend.models.job import Job
 
     external_id = "shared-source-id"
     canonical = make_canonical_key(
