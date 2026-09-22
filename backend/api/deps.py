@@ -4,7 +4,7 @@ Centralized request-scoped dependencies for database sessions,
 repositories, authentication services, and authenticated users.
 """
 
-from __future__ import annotations
+from __future__ import annotations  # noqa: I001
 
 import uuid
 from collections.abc import AsyncGenerator
