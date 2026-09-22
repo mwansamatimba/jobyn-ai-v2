@@ -210,6 +210,14 @@ def test_utf8_extra_columns_and_blank_rows(client, admin_token):
     assert response.json()["rows_imported"] == 1
 
 
+def test_malformed_csv_is_rejected(client, admin_token):
+    body = b'title,company,external_url\n"Unclosed,Company,https://example.com/job\n'
+    response = client.post(
+        PREVIEW, files={"file": ("broken.csv", body, "text/csv")}, headers=auth_header(admin_token)
+    )
+    assert response.status_code == 400
+
+
 def test_empty_and_non_csv_uploads_are_rejected(client, admin_token):
     headers = auth_header(admin_token)
     empty = client.post(PREVIEW, files={"file": ("empty.csv", b"", "text/csv")}, headers=headers)
