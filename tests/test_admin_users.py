@@ -6,10 +6,12 @@ import asyncio
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 
 from backend.core.config import get_settings
 from backend.database.base import Base
-from backend.database.session import engine
+from backend.database.session import async_session_maker, engine
+from backend.models.ingestion import ComplianceEvent
 
 REGISTER = "/api/v1/auth/register"
 LOGIN = "/api/v1/auth/login"
@@ -269,3 +271,34 @@ def test_admin_detail_is_not_available_for_normal_user(client: TestClient) -> No
 
     response = client.get(f"{ADMINS}/{target_id}", headers=_auth(normal_token))
     assert response.status_code == 403
+
+def test_admin_actions_are_audited(client: TestClient) -> None:
+    token = _bootstrap(client, "task7-audit-owner@example.com")
+    response = client.post(
+        ADMINS,
+        headers=_auth(token),
+        json={
+            "email": "task7-audit-target@example.com",
+            "password": "created-secret1",
+            "full_name": "Audited Administrator",
+        },
+    )
+    assert response.status_code == 201
+
+    async def read_events() -> list[str]:
+        async with async_session_maker() as session:
+            result = await session.execute(select(ComplianceEvent.notes))
+            return [value for value in result.scalars().all() if value]
+
+    events = asyncio.run(read_events())
+    assert any('"action": "ADMIN_CREATED"' in event for event in events)
+
+
+def test_admin_accounts_appear_in_openapi(client: TestClient) -> None:
+    response = client.get("/openapi.json")
+    assert response.status_code == 200
+    paths = response.json()["paths"]
+    assert "/api/v1/admin/users" in paths
+    assert "/api/v1/admin/users/{user_id}" in paths
+    assert "/api/v1/admin/users/{user_id}/password" in paths
+    assert "Admin Accounts" in paths["/api/v1/admin/users"]["get"]["tags"]
