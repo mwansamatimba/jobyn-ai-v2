@@ -1,6 +1,8 @@
-import asyncio
 """Administrator CSV job import API tests."""
 
+from __future__ import annotations
+
+import asyncio
 import csv
 import io
 
