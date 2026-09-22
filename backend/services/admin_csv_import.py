@@ -22,7 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.ingestion.dedup import make_canonical_key, make_url_key
 from backend.ingestion.sanitize import sanitize_html, validate_application_url
 from backend.ingestion.schema import NormalizedJob
-from backend.ingestion.sync import _ensure_source_record, _process_job
+from backend.ingestion.sync import _process_job
 from backend.models.enums import (
     ComplianceEventType,
     EmploymentType,
@@ -36,7 +36,12 @@ from backend.models.enums import (
 from backend.models.ingestion import ComplianceEvent, IngestionSource, JobIngestionSource
 from backend.models.job import Job
 from backend.models.user import User
-from backend.schemas.admin_jobs import CSVRowError, JobImportHistoryItem, JobImportPreview, JobImportResult
+from backend.schemas.admin_jobs import (
+    CSVRowError,
+    JobImportHistoryItem,
+    JobImportPreview,
+    JobImportResult,
+)
 
 ADMIN_CSV_SOURCE = "admin_csv"
 MAX_FILE_BYTES = 5 * 1024 * 1024
