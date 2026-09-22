@@ -57,6 +57,13 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
         server_default=text("false"),
         nullable=False,
     )
+    role: Mapped[str] = mapped_column(
+        String(32),
+        default="user",
+        server_default=text("'user'"),
+        nullable=False,
+        index=True,
+    )
 
     # Profile composition: these records only exist within a user's profile.
     settings: Mapped[UserSettings | None] = relationship(
