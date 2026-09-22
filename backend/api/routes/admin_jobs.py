@@ -4,6 +4,24 @@ from __future__ import annotations
 
 from typing import Annotated
 
+
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi.responses import Response
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from backend.api.deps import get_session, require_admin
+from backend.models.user import User
+from backend.schemas.admin_jobs import (
+    JobImportHistoryItem,
+    JobImportPreview,
+    JobImportResult,
+)
+from backend.services.admin_csv_import import (
+    CSVImportError,
+    CSVImportService,
+    csv_template,
+)
+
 router = APIRouter(prefix="/admin/jobs/import", tags=["Admin Jobs"])
 _service = CSVImportService()
 
@@ -79,22 +97,3 @@ async def list_job_csv_history(
     session: AsyncSession = Depends(get_session),
 ) -> list[JobImportHistoryItem]:
     return await _service.history(session)
-
-
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
-from fastapi.responses import Response
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from backend.api.deps import get_session, require_admin
-from backend.models.user import User
-from backend.schemas.admin_jobs import (
-    JobImportHistoryItem,
-    JobImportPreview,
-    JobImportResult,
-)
-from backend.services.admin_csv_import import (
-    CSVImportError,
-    CSVImportService,
-    csv_template,
-)
-
