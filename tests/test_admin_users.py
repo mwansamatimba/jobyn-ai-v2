@@ -5,13 +5,13 @@ from __future__ import annotations
 import asyncio
 
 import pytest
+from fastapi.testclient import TestClient
+from sqlalchemy import select
 
 from backend.core.config import get_settings
 from backend.database.base import Base
 from backend.database.session import async_session_maker, engine
 from backend.models.ingestion import ComplianceEvent
-from fastapi.testclient import TestClient
-from sqlalchemy import select
 
 REGISTER = "/api/v1/auth/register"
 LOGIN = "/api/v1/auth/login"
