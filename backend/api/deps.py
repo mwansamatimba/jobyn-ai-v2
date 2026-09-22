@@ -9,10 +9,6 @@ from __future__ import annotations
 import uuid
 from collections.abc import AsyncGenerator
 
-from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from backend.auth.jwt import InvalidTokenError, verify_token
 from backend.core.config import get_settings
 from backend.database.session import async_session_maker
@@ -20,6 +16,10 @@ from backend.models.user import User
 from backend.repositories.user import UserRepository
 from backend.services.admin_accounts import AdminAccountService
 from backend.services.auth import AuthService
+
+from fastapi import Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 __all__ = [
