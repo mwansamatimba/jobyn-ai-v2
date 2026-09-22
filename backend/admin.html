@@ -29,7 +29,7 @@
 
   <section class="card hidden" id="import-card">
     <h2>Import jobs</h2>
-    <p><a href="/api/v1/admin/jobs/import/template" id="template-link">Download CSV template</a></p>
+    <p><button class="secondary" onclick="downloadTemplate()">Download CSV template</button></p>
     <input id="csv" type="file" accept=".csv,text/csv">
     <button onclick="preview()">Validate &amp; preview</button>
     <button onclick="importJobs()">Confirm import</button>
@@ -60,6 +60,7 @@ async function send(path){
   const data=await r.json().catch(()=>({detail:"Invalid server response"}));
   $("result").textContent=JSON.stringify(data,null,2);
 }
+async function downloadTemplate(){const r=await fetch("/api/v1/admin/jobs/import/template",{headers:headers()});if(!r.ok){$("result").textContent="Template download failed ("+r.status+").";return}const blob=await r.blob();const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="jobyn-job-import-template.csv";a.click();URL.revokeObjectURL(a.href)}
 async function preview(){await send("/api/v1/admin/jobs/import/preview")}
 async function importJobs(){await send("/api/v1/admin/jobs/import");await refreshHistory()}
 async function refreshHistory(){const r=await fetch("/api/v1/admin/jobs/import/history",{headers:headers()});if(r.ok)$("history").textContent=JSON.stringify(await r.json(),null,2)}
