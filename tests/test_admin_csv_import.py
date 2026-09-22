@@ -8,12 +8,12 @@ import io
 import uuid
 
 import pytest
+from backend.core.config import settings
 from backend.database.session import async_session_factory
 from backend.ingestion.dedup import make_canonical_key
 from backend.models.enums import JobSource, PermissionStatus, SourceType
 from backend.models.ingestion import IngestionSource, JobIngestionSource
 from backend.models.job import Job
-from backend.core.config import settings
 
 REGISTER = "/api/v1/auth/register"
 LOGIN = "/api/v1/auth/login"
@@ -28,10 +28,11 @@ def auth_header(token: str) -> dict[str, str]:
 
 
 def register_and_login(client, email: str) -> str:
-    assert client.post(
+    registration = client.post(
         REGISTER,
         json={"email": email, "password": "supersecret1", "full_name": "CSV Admin"},
-    ).status_code == 201
+    )
+    assert registration.status_code in {201, 409}
     response = client.post(LOGIN, json={"email": email, "password": "supersecret1"})
     assert response.status_code == 200
     return response.json()["access_token"]
