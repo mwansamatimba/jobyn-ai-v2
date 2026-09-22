@@ -263,3 +263,64 @@ def test_row_limit(client, admin_token):
         headers=auth_header(admin_token),
     )
     assert response.status_code == 400
+
+
+def test_same_external_id_from_other_source_does_not_merge(client, admin_token):
+    import asyncio
+    import uuid
+    from backend.database.session import async_session_factory
+    from backend.ingestion.dedup import make_canonical_key
+    from backend.models.enums import JobSource, PermissionStatus, SourceType
+    from backend.models.ingestion import IngestionSource, JobIngestionSource
+    from backend.models.job import Job
+
+    external_id = "shared-source-id"
+    canonical = make_canonical_key("greenhouse", external_id, "https://greenhouse.example/jobs/shared")
+
+    async def seed():
+        async with async_session_factory() as session:
+            source = IngestionSource(
+                id=uuid.uuid4(), name="greenhouse-isolation", organization_name="Greenhouse",
+                source_type=SourceType.API, permission_status=PermissionStatus.OFFICIAL_API, active=True,
+            )
+            job = Job(
+                id=uuid.uuid4(), title="Greenhouse Job", company_name="Greenhouse Co",
+                external_id=external_id, source_name="greenhouse-isolation", canonical_key=canonical,
+                external_url="https://greenhouse.example/jobs/shared", source=JobSource.EXTERNAL,
+                is_active=True,
+            )
+            session.add_all([source, job])
+            await session.flush()
+            session.add(JobIngestionSource(
+                id=uuid.uuid4(), job_id=job.id, source_id=source.id, external_id=external_id,
+                application_url=job.external_url, status="active",
+            ))
+            await session.commit()
+
+    asyncio.run(seed())
+    body = csv_bytes([job_row(external_id, "https://example.com/jobs/shared-admin")])
+    response = client.post(IMPORT, files={"file": ("jobs.csv", body, "text/csv")}, headers=auth_header(admin_token))
+    assert response.status_code == 200
+    assert response.json()["rows_imported"] == 1
+
+
+def test_fatal_import_error_rolls_back_batch(client, admin_token, monkeypatch):
+    from backend.database.session import async_session_factory
+    from backend.models.job import Job
+    from sqlalchemy import select
+
+    async def fail(*args, **kwargs):
+        raise RuntimeError("forced database failure")
+
+    monkeypatch.setattr("backend.services.admin_csv_import._process_job", fail)
+    external_id = "rollback-001"
+    body = csv_bytes([job_row(external_id, "https://example.com/jobs/rollback-001")])
+    response = client.post(IMPORT, files={"file": ("rollback.csv", body, "text/csv")}, headers=auth_header(admin_token))
+    assert response.status_code == 500
+
+    async def check():
+        async with async_session_factory() as session:
+            result = await session.execute(select(Job).where(Job.external_id == external_id))
+            return result.scalar_one_or_none()
+
+    assert asyncio.run(check()) is None
