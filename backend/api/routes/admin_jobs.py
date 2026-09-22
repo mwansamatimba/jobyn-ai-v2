@@ -10,16 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.api.deps import get_session, require_admin
 from backend.models.user import User
-from backend.schemas.admin_jobs import (
-    JobImportHistoryItem,
-    JobImportPreview,
-    JobImportResult,
-)
-from backend.services.admin_csv_import import (
-    CSVImportError,
-    CSVImportService,
-    csv_template,
-)
+from backend.schemas.admin_jobs import JobImportHistoryItem, JobImportPreview, JobImportResult
+from backend.services.admin_csv_import import CSVImportError, CSVImportService, csv_template
 
 router = APIRouter(prefix="/admin/jobs/import", tags=["Admin Jobs"])
 _service = CSVImportService()
