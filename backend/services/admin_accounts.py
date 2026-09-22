@@ -5,7 +5,7 @@ returns authentication secrets and records management actions in the existing
 ComplianceEvent audit trail.
 """
 
-from __future__ import annotations
+from __future__ import annotations  # noqa: I001
 
 import json
 from fastapi import HTTPException, status
