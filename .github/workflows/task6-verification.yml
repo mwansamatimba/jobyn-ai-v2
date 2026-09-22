@@ -1,0 +1,29 @@
+name: Task 6 verification
+
+on:
+  pull_request:
+    branches: [vercel-demo]
+
+jobs:
+  verification:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+      - name: Task 6 focused tests
+        run: pytest tests/test_admin_csv_import.py -q
+      - name: Task 3 regression
+        run: pytest tests/test_ingestion_engine.py -q
+      - name: Task 4 regression
+        run: pytest tests/test_jobs.py -q
+      - name: Task 5 regression
+        run: pytest tests/test_demo.py -q
+      - name: Full suite
+        run: pytest -q
