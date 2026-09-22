@@ -259,7 +259,7 @@ def test_upload_size_limit(client, admin_token):
 def test_row_limit(client, admin_token):
     rows = [job_row(f"bulk-{i}", f"https://example.com/jobs/bulk-{i}") for i in range(1001)]
     response = client.post(
-        PREVIEW, files={"file": ("too-many.csv", csv_bytes(rows)), "headers": None},
+        PREVIEW, files={"file": ("too-many.csv", csv_bytes(rows), "text/csv")},
         headers=auth_header(admin_token),
     )
     assert response.status_code == 400
