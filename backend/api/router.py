@@ -2,6 +2,7 @@
 
 from fastapi import APIRouter
 
+from backend.api.routes import admin_jobs
 from backend.api.routes import application_copilot
 from backend.api.routes import applications
 from backend.api.routes import auth
@@ -15,6 +16,9 @@ api_router = APIRouter(prefix="/api/v1")
 
 # Authentication endpoints
 api_router.include_router(auth.router)
+
+# Administrator-only job import endpoints
+api_router.include_router(admin_jobs.router)
 
 # User profile endpoints
 api_router.include_router(users.router)
