@@ -106,6 +106,8 @@ async def run_keyword_dataset(
             if isinstance(records, list):
                 return [item for item in records if isinstance(item, dict)]
         raise BrightDataError("Bright Data snapshot returned an unsupported response shape")
+    except (ValueError, TypeError) as exc:
+        raise BrightDataError("Bright Data returned malformed JSON") from exc
     except httpx.HTTPStatusError as exc:
         status = exc.response.status_code
         if status == 401:
