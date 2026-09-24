@@ -63,11 +63,7 @@ class BrightDataLinkedInConnector(JobSourceConnector):
 
     async def fetch_jobs(self) -> list[NormalizedJob]:
         settings = get_settings()
-        per_input = max(
-            1,
-            (self.limit + max(1, len(self.searches)) - 1)
-            // max(1, len(self.searches)),
-        )
+        per_input = max(1, self.limit)
         inputs = [
             {
                 "location": "Zambia",
