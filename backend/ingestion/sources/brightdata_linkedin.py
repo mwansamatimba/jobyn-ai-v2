@@ -63,7 +63,11 @@ class BrightDataLinkedInConnector(JobSourceConnector):
 
     async def fetch_jobs(self) -> list[NormalizedJob]:
         settings = get_settings()
-        per_input = max(1, (self.limit + max(1, len(self.searches)) - 1) // max(1, len(self.searches)))
+        per_input = max(
+            1,
+            (self.limit + max(1, len(self.searches)) - 1)
+            // max(1, len(self.searches)),
+        )
         inputs = [
             {
                 "location": "Zambia",
@@ -134,10 +138,16 @@ class BrightDataLinkedInConnector(JobSourceConnector):
                 attribution=self.attribution_template,
                 location=location[:255],
                 description=sanitize_html(description),
-                requirements=sanitize_html(str(_first(raw_job, "requirements", "qualifications") or "")),
+                requirements=sanitize_html(
+                    str(_first(raw_job, "requirements", "qualifications") or "")
+                ),
                 employment_type=str(_first(raw_job, "employment_type", "job_type") or ""),
-                experience_level=str(_first(raw_job, "job_seniority_level", "seniority_level") or ""),
-                date_posted=_parse_date(_first(raw_job, "date_posted", "posted_date", "job_posted_date")),
+                experience_level=str(
+                    _first(raw_job, "job_seniority_level", "seniority_level") or ""
+                ),
+                date_posted=_parse_date(
+                    _first(raw_job, "date_posted", "posted_date", "job_posted_date")
+                ),
                 salary_min=_first(raw_job, "salary_min", "min_salary"),
                 salary_max=_first(raw_job, "salary_max", "max_salary"),
                 currency=str(_first(raw_job, "salary_currency", "currency") or "USD")[:3],
