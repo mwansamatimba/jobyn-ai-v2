@@ -50,7 +50,7 @@ async def run_keyword_dataset(
         "type": "discover_new",
         "discover_by": "keyword",
         "limit_per_input": str(max(1, limit_per_input)),
-        "limit_multiple_results": str(max(1, total_limit or (limit_per_input * len(inputs))),),
+        "limit_multiple_results": str(max(1, total_limit or (limit_per_input * len(inputs)))),
     }
     headers = {
         "Authorization": f"Bearer {api_key}",
