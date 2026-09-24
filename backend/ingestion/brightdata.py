@@ -30,6 +30,7 @@ async def run_keyword_dataset(
     dataset_id: str,
     inputs: list[dict[str, Any]],
     limit_per_input: int,
+    total_limit: int | None = None,
     base_url: str = DEFAULT_BASE_URL,
     client: httpx.AsyncClient | None = None,
     poll_interval: float = DEFAULT_POLL_INTERVAL,
@@ -49,7 +50,7 @@ async def run_keyword_dataset(
         "type": "discover_new",
         "discover_by": "keyword",
         "limit_per_input": str(max(1, limit_per_input)),
-        "limit_multiple_results": str(max(1, limit_per_input * len(inputs))),
+        "limit_multiple_results": str(max(1, total_limit or (limit_per_input * len(inputs))),),
     }
     headers = {
         "Authorization": f"Bearer {api_key}",
