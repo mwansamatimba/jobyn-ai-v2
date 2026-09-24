@@ -62,7 +62,11 @@ class BrightDataIndeedConnector(JobSourceConnector):
 
     async def fetch_jobs(self) -> list[NormalizedJob]:
         settings = get_settings()
-        per_input = max(1, (self.limit + max(1, len(self.searches)) - 1) // max(1, len(self.searches)))
+        per_input = max(
+            1,
+            (self.limit + max(1, len(self.searches)) - 1)
+            // max(1, len(self.searches)),
+        )
         inputs = [
             {
                 "country": "ZM",
@@ -126,7 +130,9 @@ class BrightDataIndeedConnector(JobSourceConnector):
                 location=location[:255],
                 country=str(_first(raw_job, "country") or "")[:100],
                 description=sanitize_html(description),
-                requirements=sanitize_html(str(_first(raw_job, "qualifications", "requirements") or "")),
+                requirements=sanitize_html(
+                    str(_first(raw_job, "qualifications", "requirements") or "")
+                ),
                 employment_type=str(_first(raw_job, "job_type", "employment_type") or ""),
                 date_posted=_parse_date(_first(raw_job, "date_posted_parsed", "date_posted")),
                 salary_min=_first(raw_job, "salary_min", "min_salary"),
