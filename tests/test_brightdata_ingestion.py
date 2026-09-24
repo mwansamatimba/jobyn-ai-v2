@@ -44,7 +44,7 @@ def _patch_fetch(module: str, rows):
 
 def test_brightdata_linkedin_parses_record():
     connector = BrightDataLinkedInConnector(searches=["Zambia jobs"], limit=20)
-    result = pytest.run(asyncio_run(connector.normalize_job(LINKEDIN_RAW)))
+    result = asyncio_run(connector.normalize_job(LINKEDIN_RAW))
     assert result is not None
     assert result.title == "Software Engineer"
     assert result.company == "Example Zambia"
@@ -54,7 +54,7 @@ def test_brightdata_linkedin_parses_record():
 
 def test_brightdata_indeed_parses_record():
     connector = BrightDataIndeedConnector(searches=["Zambia jobs"], limit=20)
-    result = pytest.run(asyncio_run(connector.normalize_job(INDEED_RAW)))
+    result = asyncio_run(connector.normalize_job(INDEED_RAW))
     assert result is not None
     assert result.title == "Software Engineer"
     assert result.external_id == "in-123"
@@ -166,8 +166,6 @@ class _FakeConnector:
 
 @pytest.mark.asyncio
 async def test_same_linkedin_job_is_idempotent(db_session):
-    from backend.ingestion.sync import _build_connectors
-
     connector = _FakeConnector("linkedin", [_job(
         "linkedin", "li-1", "https://www.linkedin.com/jobs/view/shared"
     )])
