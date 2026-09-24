@@ -93,7 +93,10 @@ async def main() -> None:
         print(f"Total fetched:             {result.total_fetched}")
         print(f"Total inserted:            {result.total_created}")
         print(f"Total updated:             {result.total_updated}")
-        print("Credit usage:              Not exposed by the Bright Data trigger/snapshot response.")
+        print(
+            "Credit usage:              Not exposed by the Bright Data "
+            "trigger/snapshot response."
+        )
 
 
 if __name__ == "__main__":
