@@ -622,6 +622,8 @@ def _build_connectors(
     from backend.ingestion.sources.ashby import AshbyConnector
     from backend.ingestion.sources.reliefweb import ReliefWebConnector
     from backend.ingestion.sources.un_careers import UNCareersConnector
+    from backend.ingestion.sources.brightdata_linkedin import BrightDataLinkedInConnector
+    from backend.ingestion.sources.brightdata_indeed import BrightDataIndeedConnector
 
     connectors: list[JobSourceConnector] = []
 
@@ -648,5 +650,11 @@ def _build_connectors(
 
     if settings.UN_CAREERS_ENABLED and _want("un_careers"):
         connectors.append(UNCareersConnector())
+
+    if settings.BRIGHTDATA_LINKEDIN_ENABLED and _want("linkedin"):
+        connectors.append(BrightDataLinkedInConnector())
+
+    if settings.BRIGHTDATA_INDEED_ENABLED and _want("indeed"):
+        connectors.append(BrightDataIndeedConnector())
 
     return connectors

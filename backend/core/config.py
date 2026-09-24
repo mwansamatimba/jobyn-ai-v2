@@ -187,6 +187,21 @@ class Settings(BaseSettings):
     # UN Careers — official RSS feed
     UN_CAREERS_ENABLED: bool = True
 
+    # Bright Data Jobs — controlled MVP (LinkedIn + Indeed only)
+    BRIGHTDATA_API_KEY: str | None = None
+    BRIGHTDATA_API_BASE_URL: str = "https://api.brightdata.com"
+    BRIGHTDATA_LINKEDIN_ENABLED: bool = False
+    BRIGHTDATA_INDEED_ENABLED: bool = False
+    BRIGHTDATA_LINKEDIN_DATASET_ID: str = "gd_lpfll7v5hcqtkxl6l"
+    BRIGHTDATA_INDEED_DATASET_ID: str = "gd_l4dx9j9sscpvs7no2"
+    BRIGHTDATA_SEARCHES: str = "Zambia jobs,Lusaka jobs,Zambia software developer,Zambia business analyst,Zambia accountant,Zambia engineer"
+    BRIGHTDATA_TEST_MODE: bool = False
+    BRIGHTDATA_LIVE_TEST: bool = False
+    BRIGHTDATA_TEST_LIMIT: int = 25
+    BRIGHTDATA_MAX_RECORDS_PER_SOURCE: int = 50
+    BRIGHTDATA_POLL_INTERVAL_SECONDS: float = 5.0
+    BRIGHTDATA_POLL_TIMEOUT_SECONDS: float = 180.0
+
     # HTTP client settings for the ingestion engine
     INGESTION_REQUEST_TIMEOUT: float = 30.0
     INGESTION_MAX_RETRIES: int = 3
