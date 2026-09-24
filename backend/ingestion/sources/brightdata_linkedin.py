@@ -86,6 +86,7 @@ class BrightDataLinkedInConnector(JobSourceConnector):
                 dataset_id=settings.BRIGHTDATA_LINKEDIN_DATASET_ID,
                 inputs=inputs,
                 limit_per_input=per_input,
+                total_limit=self.limit,
                 base_url=settings.BRIGHTDATA_API_BASE_URL,
                 client=self._client,
                 poll_interval=settings.BRIGHTDATA_POLL_INTERVAL_SECONDS,
