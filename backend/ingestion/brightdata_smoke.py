@@ -9,8 +9,6 @@ The existing ingestion permission gate is never bypassed by this script.
 from __future__ import annotations
 
 import asyncio
-import os
-
 from sqlalchemy import select
 
 from backend.core.config import get_settings
