@@ -33,6 +33,7 @@ from backend.models.enums import (
     ResumeStatus,
     UserSkillProficiency,
 )
+from backend.models.ingestion import IngestionSourceRecord, JobIngestionSource, JobObservation
 from backend.models.job import Application, Job, MatchResult
 from backend.models.mixins import SoftDeleteMixin, TimestampMixin, UUIDPrimaryKeyMixin
 from backend.models.resume import (
@@ -59,7 +60,10 @@ __all__ = [
     "ExperienceLevel",
     "GeneratedResume",
     "GenerationStatus",
+    "IngestionSourceRecord",
     "Job",
+    "JobIngestionSource",
+    "JobObservation",
     "JobSource",
     "LocationType",
     "MatchResult",

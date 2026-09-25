@@ -44,6 +44,7 @@ from backend.models.mixins import (
 )
 
 if TYPE_CHECKING:
+    from backend.models.ingestion import JobIngestionSource
     from backend.models.resume import Resume
     from backend.models.user import User
 
@@ -99,6 +100,27 @@ class Job(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
         nullable=False,
     )
     external_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    canonical_key: Mapped[str | None] = mapped_column(String(512), index=True, nullable=True)
+    external_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    source_name: Mapped[str | None] = mapped_column(String(100), index=True, nullable=True)
+    source_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    attribution: Mapped[str | None] = mapped_column(Text, nullable=True)
+    country: Mapped[str | None] = mapped_column(String(100), index=True, nullable=True)
+    province: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    city: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    remote_eligibility: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    category: Mapped[str | None] = mapped_column(String(32), index=True, nullable=True)
+    requirements: Mapped[str | None] = mapped_column(Text, nullable=True)
+    deadline: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    ingestion_status: Mapped[str | None] = mapped_column(
+        String(32), default="active", server_default="active", nullable=True
+    )
+    first_seen: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_seen: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_verified: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    missed_syncs: Mapped[int] = mapped_column(
+        Integer, default=0, server_default="0", nullable=False
+    )
     created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
@@ -113,6 +135,10 @@ class Job(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
         cascade="all, delete-orphan",
     )
     applications: Mapped[list[Application]] = orm_relationship(
+        back_populates="job",
+        cascade="all, delete-orphan",
+    )
+    ingestion_sources: Mapped[list[JobIngestionSource]] = orm_relationship(
         back_populates="job",
         cascade="all, delete-orphan",
     )
