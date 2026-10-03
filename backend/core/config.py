@@ -9,7 +9,7 @@ core level.
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import field_validator
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -42,6 +42,8 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 10080
 
     DATABASE_URL: str = "sqlite+aiosqlite:///./jobyn.db"
+    CSV_IMPORT_MAX_FILE_SIZE_BYTES: int = Field(default=5_242_880, ge=1, le=52_428_800)
+    CSV_IMPORT_MAX_ROWS: int = Field(default=500, ge=1, le=10_000)
 
     REDIS_URL: str = "redis://localhost:6379/0"
 

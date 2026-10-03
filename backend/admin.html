@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Jobyn Admin — Vacancy CSV</title>
+  <style>
+    :root{font-family:system-ui,sans-serif;color:#17332d;background:#f4f7f6}
+    body{max-width:1000px;margin:32px auto;padding:0 18px}
+    section{background:#fff;border:1px solid #d9e3df;border-radius:12px;padding:22px;margin:16px 0}
+    input,textarea,button{font:inherit;border:1px solid #aabbb5;border-radius:7px;padding:9px}
+    input,textarea{box-sizing:border-box;width:100%;margin:6px 0 14px}
+    textarea{min-height:70px;font-family:monospace}
+    button{background:#17332d;color:#fff;cursor:pointer;margin:4px 8px 4px 0}
+    button.secondary{background:white;color:#17332d}
+    button:disabled{opacity:.45;cursor:not-allowed}
+    .hidden{display:none}.error{color:#9b2525}.ok{color:#176b45}
+    pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#f2f5f4;padding:12px;border-radius:8px}
+    table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:9px;border-bottom:1px solid #e2e9e6}
+  </style>
+</head>
+<body>
+  <h1>Job Vacancy CSV Import</h1>
+  <p>CSV / UTF-8 · Maximum 5 MiB / 500 rows · Imported records remain in isolated staging.</p>
+  <section id="login">
+    <h2>Administrator sign-in</h2>
+    <label>Email<input id="email" type="email" autocomplete="username"></label>
+    <label>Password<input id="password" type="password" autocomplete="current-password"></label>
+    <button id="login-button">Sign in</button>
+    <p id="login-message" role="status"></p>
+  </section>
+  <main id="workspace" class="hidden">
+    <section>
+      <p>Signed in as <strong id="admin-email"></strong> <button id="logout" class="secondary">Sign out</button></p>
+      <h2>Upload and preview</h2>
+      <label>Choose CSV file<input id="csv-file" type="file" accept=".csv,text/csv"></label>
+      <label>Optional column mapping (JSON header-to-field object)
+        <textarea id="mapping" placeholder='{"Position":"title","Employer":"company"}'></textarea>
+      </label>
+      <button id="preview-button">Preview CSV</button>
+      <pre id="preview-result">Choose a CSV file to begin.</pre>
+      <div id="row-errors"></div>
+      <button id="cancel-button" class="secondary">Cancel</button>
+      <button id="confirm-button" disabled>Confirm Import</button>
+      <pre id="import-result" aria-live="polite"></pre>
+    </section>
+    <section>
+      <h2>Import history</h2>
+      <button id="refresh-history" class="secondary">Refresh history</button>
+      <div id="history">Loading…</div>
+      <h3>Batch details</h3>
+      <pre id="batch-detail">Select an import batch to view its summary.</pre>
+    </section>
+  </main>
+<script>
+const tokenKey="jobyn.admin.access_token";
+const $=id=>document.getElementById(id);
+let previewReady=false;
+let confirmationToken=null;
+function authHeaders(){return {"Authorization":"Bearer "+sessionStorage.getItem(tokenKey)}}
+function mappingValue(){const text=$("mapping").value.trim();return text?text:null}
+async function api(path,options={}){
+  const headers=Object.assign(authHeaders(),options.headers||{});
+  const response=await fetch(path,Object.assign({},options,{headers}));
+  const data=await response.json().catch(()=>null);
+  if(!response.ok)throw new Error(data?.detail||"Request failed ("+response.status+").");
+  return data;
+}
+function clearPreview(){
+  previewReady=false;
+  confirmationToken=null;
+  $("confirm-button").disabled=true;
+  $("preview-result").textContent="Preview cleared. Select and preview a CSV before confirming.";
+  $("row-errors").replaceChildren();
+  $("import-result").textContent="";
+}
+async function signIn(){
+  $("login-message").textContent="";
+  try{
+    const response=await fetch("/api/v1/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:$("email").value,password:$("password").value})});
+    const data=await response.json().catch(()=>null);
+    if(!response.ok)throw new Error(data?.detail||"Sign-in failed.");
+    sessionStorage.setItem(tokenKey,data.access_token);
+    await loadWorkspace();
+  }catch(error){$("login-message").className="error";$("login-message").textContent=error.message}
+}
+async function loadWorkspace(){
+  try{
+    const user=await api("/api/v1/auth/me");
+    if(user.role!=="admin")throw new Error("Administrator access required.");
+    $("admin-email").textContent=user.email;
+    $("login").classList.add("hidden");
+    $("workspace").classList.remove("hidden");
+    await loadHistory();
+  }catch(error){
+    sessionStorage.removeItem(tokenKey);
+    $("workspace").classList.add("hidden");
+    $("login").classList.remove("hidden");
+    $("login-message").className="error";
+    $("login-message").textContent=error.message;
+  }
+}
+function formData(includeConfirmation=false){
+  const file=$("csv-file").files[0];
+  if(!file)throw new Error("Choose a CSV file first.");
+  const data=new FormData();data.append("file",file);
+  const mapping=mappingValue();if(mapping)data.append("column_mapping",mapping);
+  if(includeConfirmation&&confirmationToken)data.append("confirmation_token",confirmationToken);
+  return data;
+}
+async function previewCsv(){
+  clearPreview();
+  try{
+    const result=await api("/api/v1/admin/jobs/csv/preview",{method:"POST",body:formData()});
+    confirmationToken=result.confirmation_token;
+    $("preview-result").textContent=JSON.stringify({
+      filename:result.filename,
+      rows_detected:result.rows_detected,
+      valid_rows:result.valid_rows,
+      invalid_rows:result.invalid_rows,
+      duplicate_rows:result.duplicate_rows,
+      ready_to_import:result.ready_to_import
+    },null,2);
+    $("row-errors").replaceChildren();
+    const recordTable=document.createElement("table");
+    const recordHead=document.createElement("tr");
+    for(const label of ["Row","Title","Company","Location","Source","Listing domain","Apply link","Action"]){
+      const cell=document.createElement("th");cell.textContent=label;recordHead.appendChild(cell);
+    }
+    const recordHeader=document.createElement("thead");recordHeader.appendChild(recordHead);recordTable.appendChild(recordHeader);
+    const recordBody=document.createElement("tbody");
+    for(const record of result.records){
+      const row=document.createElement("tr");
+      for(const value of [record.row,record.title,record.company,record.location,record.source_name,record.source_url_domain,record.application_url_present?"Present":"Not supplied",record.existing_action]){
+        const cell=document.createElement("td");cell.textContent=String(value);row.appendChild(cell);
+      }
+      recordBody.appendChild(row);
+    }
+    recordTable.appendChild(recordBody);
+    $("row-errors").appendChild(recordTable);
+    if(result.errors.length){
+      const list=document.createElement("ul");
+      for(const issue of result.errors){
+        const item=document.createElement("li");
+        item.textContent="Row "+issue.row+" · "+issue.field+": "+issue.message;
+        list.appendChild(item);
+      }
+      $("row-errors").appendChild(list);
+    }
+    previewReady=result.ready_to_import>0&&result.invalid_rows===0;
+    $("confirm-button").disabled=!previewReady;
+    if(result.unmapped_columns.length){
+      $("row-errors").textContent+=" Unmapped columns: "+result.unmapped_columns.join(", ");
+    }
+  }catch(error){$("preview-result").textContent=error.message}
+}
+async function confirmImport(){
+  if(!previewReady)return;
+  $("confirm-button").disabled=true;
+  try{
+    const result=await api("/api/v1/admin/jobs/csv/import",{method:"POST",body:formData(true)});
+    $("import-result").textContent=JSON.stringify(result,null,2);
+    previewReady=false;
+    confirmationToken=null;
+    $("confirm-button").disabled=true;
+    $("preview-result").textContent="Imported to isolated staging. These records have not been published to Jobyn.";
+    $("row-errors").replaceChildren();
+    await loadHistory();
+  }catch(error){
+    $("import-result").textContent=error.message;
+    $("confirm-button").disabled=!previewReady;
+  }
+}
+async function loadHistory(){
+  try{
+    const batches=await api("/api/v1/admin/jobs/csv/imports");
+    const host=$("history");host.replaceChildren();
+    if(!batches.length){host.textContent="No CSV imports yet.";return}
+    const table=document.createElement("table");
+    const head=document.createElement("tr");
+    for(const label of ["Created","Filename","Rows","Imported","Updated","Duplicates","Rejected",""]){
+      const cell=document.createElement("th");cell.textContent=label;head.appendChild(cell);
+    }
+    const thead=document.createElement("thead");thead.appendChild(head);table.appendChild(thead);
+    const body=document.createElement("tbody");
+    for(const batch of batches){
+      const row=document.createElement("tr");
+      for(const value of [new Date(batch.created_at).toLocaleString(),batch.filename,batch.row_count,batch.imported_count,batch.updated_count,batch.duplicate_count,batch.rejected_count]){
+        const cell=document.createElement("td");cell.textContent=String(value);row.appendChild(cell);
+      }
+      const action=document.createElement("td");
+      const button=document.createElement("button");button.className="secondary";button.textContent="Details";
+      button.onclick=()=>showBatch(batch.batch_id);action.appendChild(button);row.appendChild(action);body.appendChild(row);
+    }
+    table.appendChild(body);host.appendChild(table);
+  }catch(error){$("history").textContent=error.message}
+}
+async function showBatch(id){
+  try{$("batch-detail").textContent=JSON.stringify(await api("/api/v1/admin/jobs/csv/imports/"+encodeURIComponent(id)),null,2)}
+  catch(error){$("batch-detail").textContent=error.message}
+}
+$("login-button").onclick=signIn;
+$("preview-button").onclick=previewCsv;
+$("confirm-button").onclick=confirmImport;
+$("cancel-button").onclick=clearPreview;
+$("refresh-history").onclick=loadHistory;
+$("logout").onclick=()=>{sessionStorage.removeItem(tokenKey);location.reload()};
+$("csv-file").onchange=clearPreview;
+$("mapping").oninput=clearPreview;
+if(sessionStorage.getItem(tokenKey))loadWorkspace();
+</script>
+</body>
+</html>

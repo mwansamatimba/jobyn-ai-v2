@@ -2,6 +2,7 @@
 
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
@@ -16,6 +17,7 @@ class UserRead(BaseModel):
     full_name: str | None = None
     is_active: bool
     is_verified: bool
+    role: Literal["admin", "user"] = "user"
     created_at: datetime
 
 

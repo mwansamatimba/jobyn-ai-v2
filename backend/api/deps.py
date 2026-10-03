@@ -17,7 +17,7 @@ from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.core.errors import AuthenticationError
+from backend.core.errors import AuthenticationError, AuthorizationError
 from backend.core.security import decode_token
 from backend.database.session import async_session_factory
 from backend.models.user import User
@@ -72,3 +72,12 @@ async def get_current_user(
     if user is None:
         raise AuthenticationError("Account no longer exists")
     return user
+
+
+async def require_admin(
+    current_user: User = Depends(get_current_user),
+) -> User:
+    """Require an active account with a persisted administrator role."""
+    if not current_user.is_active or current_user.role != "admin":
+        raise AuthorizationError("Administrator access required")
+    return current_user
