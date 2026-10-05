@@ -3,211 +3,950 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Jobyn Admin — Vacancy CSV</title>
+  <title>Jobyn Admin — Vacancy CSV Import</title>
   <style>
-    :root{font-family:system-ui,sans-serif;color:#17332d;background:#f4f7f6}
-    body{max-width:1000px;margin:32px auto;padding:0 18px}
-    section{background:#fff;border:1px solid #d9e3df;border-radius:12px;padding:22px;margin:16px 0}
-    input,textarea,button{font:inherit;border:1px solid #aabbb5;border-radius:7px;padding:9px}
-    input,textarea{box-sizing:border-box;width:100%;margin:6px 0 14px}
-    textarea{min-height:70px;font-family:monospace}
-    button{background:#17332d;color:#fff;cursor:pointer;margin:4px 8px 4px 0}
-    button.secondary{background:white;color:#17332d}
-    button:disabled{opacity:.45;cursor:not-allowed}
-    .hidden{display:none}.error{color:#9b2525}.ok{color:#176b45}
-    pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#f2f5f4;padding:12px;border-radius:8px}
-    table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:9px;border-bottom:1px solid #e2e9e6}
+    /* ── Reset / base ────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --brand:   #17332d;
+      --brand-l: #2a5248;
+      --accent:  #176b45;
+      --bg:      #f4f7f6;
+      --card:    #ffffff;
+      --border:  #d0dcd8;
+      --muted:   #5a7570;
+      --danger:  #9b2525;
+      --warn:    #7a5c00;
+      --warn-bg: #fffbeb;
+      --ok:      #176b45;
+      --ok-bg:   #edf7f2;
+      --radius:  10px;
+      --shadow:  0 1px 3px rgba(0,0,0,.08);
+      font-family: system-ui, -apple-system, sans-serif;
+      font-size: 15px;
+      color: var(--brand);
+      background: var(--bg);
+    }
+    body { max-width: 960px; margin: 28px auto; padding: 0 16px 48px; }
+    h1   { font-size: 1.35rem; font-weight: 700; margin-bottom: 4px; }
+    h2   { font-size: 1.05rem; font-weight: 600; margin-bottom: 14px; }
+    h3   { font-size: .95rem;  font-weight: 600; margin: 16px 0 8px; }
+    p.subtitle { color: var(--muted); font-size: .88rem; margin-bottom: 20px; }
+
+    /* ── Cards ───────────────────────────────────────────────────── */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 22px 24px;
+      margin-bottom: 16px;
+      box-shadow: var(--shadow);
+    }
+
+    /* ── Forms ───────────────────────────────────────────────────── */
+    label        { display: block; font-size: .88rem; font-weight: 500;
+                   color: var(--muted); margin-bottom: 6px; }
+    input, textarea, select {
+      width: 100%; padding: 9px 12px; border: 1px solid var(--border);
+      border-radius: 7px; font: inherit; background: var(--card);
+      color: var(--brand); transition: border-color .15s;
+    }
+    input:focus, textarea:focus { outline: none; border-color: var(--brand-l); }
+    textarea { min-height: 64px; font-family: monospace; font-size: .85rem; resize: vertical; }
+    .field   { margin-bottom: 14px; }
+
+    /* ── Buttons ─────────────────────────────────────────────────── */
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 9px 18px; border: none; border-radius: 7px;
+      font: inherit; font-weight: 500; cursor: pointer;
+      transition: opacity .15s, background .15s;
+    }
+    .btn:disabled { opacity: .42; cursor: not-allowed; }
+    .btn-primary  { background: var(--brand); color: #fff; }
+    .btn-primary:not(:disabled):hover { background: var(--brand-l); }
+    .btn-secondary { background: #fff; color: var(--brand);
+                     border: 1px solid var(--border); }
+    .btn-secondary:not(:disabled):hover { background: var(--bg); }
+    .btn-danger    { background: var(--danger); color: #fff; }
+    .btn-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+
+    /* ── Status banners ──────────────────────────────────────────── */
+    .banner {
+      padding: 10px 14px; border-radius: 7px; font-size: .88rem;
+      margin-top: 12px; display: none;
+    }
+    .banner.visible { display: block; }
+    .banner-error   { background: #fdf2f2; color: var(--danger); border: 1px solid #f5c6c6; }
+    .banner-ok      { background: var(--ok-bg); color: var(--ok); border: 1px solid #b2dfcc; }
+    .banner-warn    { background: var(--warn-bg); color: var(--warn); border: 1px solid #e8d8a0; }
+    .banner-info    { background: #eff6ff; color: #1e4d8c; border: 1px solid #b8d4f5; }
+
+    /* ── Preview summary grid ────────────────────────────────────── */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+      gap: 10px; margin: 14px 0;
+    }
+    .stat {
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 8px; padding: 10px 12px; text-align: center;
+    }
+    .stat-value { font-size: 1.5rem; font-weight: 700; line-height: 1.1; }
+    .stat-label { font-size: .78rem; color: var(--muted); margin-top: 2px; }
+    .stat-value.ok   { color: var(--ok); }
+    .stat-value.warn { color: var(--warn); }
+    .stat-value.bad  { color: var(--danger); }
+
+    /* ── Tables ──────────────────────────────────────────────────── */
+    .table-wrap { overflow-x: auto; margin-top: 10px; }
+    table { width: 100%; border-collapse: collapse; font-size: .875rem; }
+    th, td {
+      text-align: left; padding: 8px 10px;
+      border-bottom: 1px solid var(--border);
+    }
+    th { background: var(--bg); font-weight: 600; font-size: .82rem;
+         color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #f9fbfa; }
+    .badge {
+      display: inline-block; padding: 2px 8px; border-radius: 999px;
+      font-size: .76rem; font-weight: 600;
+    }
+    .badge-new  { background: #dff0e8; color: var(--ok); }
+    .badge-dup  { background: #fff3cd; color: var(--warn); }
+    .badge-upd  { background: #dbeafe; color: #1d4ed8; }
+
+    /* ── Import result card ──────────────────────────────────────── */
+    .result-card {
+      background: var(--ok-bg); border: 1px solid #b2dfcc;
+      border-radius: var(--radius); padding: 16px 20px; margin-top: 14px;
+      display: none;
+    }
+    .result-card.visible { display: block; }
+    .result-card h3 { color: var(--ok); margin-top: 0; }
+    .result-row { display: flex; justify-content: space-between;
+                  border-bottom: 1px solid #c8e8d8; padding: 5px 0; font-size: .88rem; }
+    .result-row:last-child { border-bottom: none; }
+    .result-row span:last-child { font-weight: 600; }
+
+    /* ── Pagination ──────────────────────────────────────────────── */
+    .pagination { display: flex; align-items: center; gap: 10px; margin-top: 12px;
+                  font-size: .88rem; color: var(--muted); }
+
+    /* ── Spinner ─────────────────────────────────────────────────── */
+    .spin { display: inline-block; width: 14px; height: 14px;
+            border: 2px solid rgba(255,255,255,.4); border-top-color: #fff;
+            border-radius: 50%; animation: spin .7s linear infinite; }
+    .spin.dark { border-color: rgba(23,51,45,.2); border-top-color: var(--brand); }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Token expiry indicator ──────────────────────────────────── */
+    #expiry-bar {
+      height: 3px; background: var(--ok); border-radius: 2px;
+      transition: width 1s linear, background 1s;
+      width: 100%; margin-top: 10px;
+    }
+
+    /* ── Misc ────────────────────────────────────────────────────── */
+    .hidden  { display: none !important; }
+    .muted   { color: var(--muted); font-size: .88rem; }
+    .divider { border: none; border-top: 1px solid var(--border); margin: 18px 0; }
+    .topbar  { display: flex; align-items: center; justify-content: space-between;
+               margin-bottom: 20px; flex-wrap: wrap; gap: 8px; }
+    .topbar-left  { display: flex; flex-direction: column; gap: 2px; }
+    .topbar-right { display: flex; align-items: center; gap: 10px; font-size: .88rem; }
+    .admin-email  { font-weight: 600; }
+
+    /* ── Error list ──────────────────────────────────────────────── */
+    .error-list { list-style: none; margin: 10px 0; }
+    .error-list li {
+      padding: 6px 10px; border-left: 3px solid var(--danger);
+      background: #fdf2f2; margin-bottom: 4px; font-size: .875rem;
+      border-radius: 0 5px 5px 0;
+    }
+    .error-list .row-ref { font-weight: 600; color: var(--danger); }
+    .error-list .field-ref { font-family: monospace; font-size: .82rem;
+                              background: #f5e0e0; padding: 1px 5px; border-radius: 4px; }
+
+    /* ── File info ───────────────────────────────────────────────── */
+    .file-info {
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 7px; padding: 8px 12px; margin-top: 6px;
+      font-size: .875rem; display: none; align-items: center; gap: 8px;
+    }
+    .file-info.visible { display: flex; }
+    .file-icon { font-size: 1.2rem; }
+
+    @media (max-width: 600px) {
+      .stat-grid { grid-template-columns: repeat(3, 1fr); }
+      .btn { padding: 8px 12px; font-size: .875rem; }
+    }
   </style>
 </head>
 <body>
-  <h1>Job Vacancy CSV Import</h1>
-  <p>CSV / UTF-8 · Maximum 5 MiB / 500 rows · Imported records remain in isolated staging.</p>
-  <section id="login">
-    <h2>Administrator sign-in</h2>
-    <label>Email<input id="email" type="email" autocomplete="username"></label>
-    <label>Password<input id="password" type="password" autocomplete="current-password"></label>
-    <button id="login-button">Sign in</button>
-    <p id="login-message" role="status"></p>
-  </section>
-  <main id="workspace" class="hidden">
-    <section>
-      <p>Signed in as <strong id="admin-email"></strong> <button id="logout" class="secondary">Sign out</button></p>
-      <h2>Upload and preview</h2>
-      <label>Choose CSV file<input id="csv-file" type="file" accept=".csv,text/csv"></label>
-      <label>Optional column mapping (JSON header-to-field object)
-        <textarea id="mapping" placeholder='{"Position":"title","Employer":"company"}'></textarea>
-      </label>
-      <button id="preview-button">Preview CSV</button>
-      <pre id="preview-result">Choose a CSV file to begin.</pre>
-      <div id="row-errors"></div>
-      <button id="cancel-button" class="secondary">Cancel</button>
-      <button id="confirm-button" disabled>Confirm Import</button>
-      <pre id="import-result" aria-live="polite"></pre>
-    </section>
-    <section>
-      <h2>Import history</h2>
-      <button id="refresh-history" class="secondary">Refresh history</button>
-      <div id="history">Loading…</div>
-      <h3>Batch details</h3>
-      <pre id="batch-detail">Select an import batch to view its summary.</pre>
-    </section>
-  </main>
+
+<!-- ── LOGIN ─────────────────────────────────────────────────────────── -->
+<div id="view-login">
+  <div style="max-width:360px; margin:60px auto 0;">
+    <h1 style="text-align:center; margin-bottom:4px;">Jobyn Admin</h1>
+    <p class="subtitle" style="text-align:center;">Vacancy CSV Import</p>
+    <div class="card">
+      <h2>Administrator sign-in</h2>
+      <div class="field">
+        <label for="email">Email address</label>
+        <input id="email" type="email" autocomplete="username" placeholder="admin@example.com">
+      </div>
+      <div class="field">
+        <label for="password">Password</label>
+        <input id="password" type="password" autocomplete="current-password">
+      </div>
+      <button id="btn-login" class="btn btn-primary" style="width:100%">Sign in</button>
+      <div id="login-error" class="banner banner-error" role="alert"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── WORKSPACE ──────────────────────────────────────────────────────── -->
+<div id="view-workspace" class="hidden">
+
+  <div class="topbar">
+    <div class="topbar-left">
+      <h1>Jobyn Admin</h1>
+      <p class="subtitle">Vacancy CSV Import — Isolated Staging</p>
+    </div>
+    <div class="topbar-right">
+      <span>Signed in as <span id="admin-email" class="admin-email"></span></span>
+      <button id="btn-logout" class="btn btn-secondary" style="padding:6px 12px">Sign out</button>
+    </div>
+  </div>
+
+  <!-- ── UPLOAD + PREVIEW ─────────────────────────────────────────── -->
+  <div class="card">
+    <h2>Upload and preview</h2>
+
+    <div class="field">
+      <label for="csv-file">CSV file <span class="muted">(UTF-8 · max 5 MiB · max 500 rows)</span></label>
+      <input id="csv-file" type="file" accept=".csv,text/csv">
+      <div id="file-info" class="file-info">
+        <span class="file-icon">📄</span>
+        <span id="file-name"></span>
+        <span id="file-size" class="muted"></span>
+      </div>
+      <div id="file-error" class="banner banner-error" role="alert"></div>
+    </div>
+
+    <div class="field">
+      <label for="mapping">Column mapping <span class="muted">(optional JSON — <code>{"CSV Header":"field_name"}</code>)</span></label>
+      <textarea id="mapping" placeholder='{"Position":"title","Employer":"company"}'></textarea>
+    </div>
+
+    <div class="btn-row">
+      <button id="btn-preview" class="btn btn-primary" disabled>Preview CSV</button>
+      <button id="btn-cancel"  class="btn btn-secondary">Cancel</button>
+      <button id="btn-import"  class="btn btn-primary"  disabled
+              title="Preview the CSV first, then confirm the import">Confirm Import</button>
+    </div>
+
+    <!-- Preview loading -->
+    <div id="preview-loading" class="banner banner-info hidden" role="status">
+      <span class="spin dark"></span>&nbsp; Analysing CSV…
+    </div>
+
+    <!-- Preview error -->
+    <div id="preview-error" class="banner banner-error hidden" role="alert"></div>
+
+    <!-- Preview result -->
+    <div id="preview-result" class="hidden">
+      <hr class="divider">
+      <h3>Preview — <span id="prev-filename"></span></h3>
+
+      <!-- Stats -->
+      <div class="stat-grid">
+        <div class="stat">
+          <div id="s-detected"      class="stat-value"></div>
+          <div class="stat-label">Rows detected</div>
+        </div>
+        <div class="stat">
+          <div id="s-ready"         class="stat-value ok"></div>
+          <div class="stat-label">Ready to import</div>
+        </div>
+        <div class="stat">
+          <div id="s-invalid"       class="stat-value"></div>
+          <div class="stat-label">Invalid rows</div>
+        </div>
+        <div class="stat">
+          <div id="s-duplicates"    class="stat-value"></div>
+          <div class="stat-label">Duplicates</div>
+        </div>
+      </div>
+
+      <!-- Token expiry bar -->
+      <div style="font-size:.8rem; color:var(--muted); margin-top:8px;">
+        Preview valid for <span id="expiry-seconds">30:00</span>
+        <div id="expiry-bar"></div>
+      </div>
+
+      <!-- Unmapped columns -->
+      <div id="unmapped-wrap" class="hidden">
+        <div class="banner banner-warn visible" id="unmapped-msg"></div>
+      </div>
+
+      <!-- Per-row validation errors -->
+      <div id="errors-wrap" class="hidden">
+        <h3>Validation issues</h3>
+        <ul id="error-list" class="error-list"></ul>
+      </div>
+
+      <!-- Records table -->
+      <div id="records-wrap" class="hidden">
+        <h3>Vacancy records</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th><th>Title</th><th>Company</th><th>Location</th>
+                <th>Source</th><th>Listing domain</th><th>Apply link</th><th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="records-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Import loading -->
+    <div id="import-loading" class="banner banner-info hidden" role="status">
+      <span class="spin dark"></span>&nbsp; Importing into isolated staging…
+    </div>
+
+    <!-- Import error -->
+    <div id="import-error" class="banner banner-error hidden" role="alert"></div>
+
+    <!-- Import result -->
+    <div id="import-result" class="result-card" role="status" aria-live="polite"></div>
+
+  </div><!-- /card -->
+
+  <!-- ── HISTORY ────────────────────────────────────────────────────── -->
+  <div class="card">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
+      <h2 style="margin:0">Import history</h2>
+      <button id="btn-refresh" class="btn btn-secondary" style="padding:6px 14px">Refresh</button>
+    </div>
+
+    <div id="history-loading" class="banner banner-info hidden" role="status">
+      <span class="spin dark"></span>&nbsp; Loading history…
+    </div>
+    <div id="history-error"  class="banner banner-error hidden" role="alert"></div>
+    <div id="history-empty"  class="banner banner-info  hidden" role="status">
+      No CSV imports recorded yet. Import a vacancy CSV above to see history here.
+    </div>
+
+    <div id="history-table-wrap" class="hidden">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Timestamp</th><th>Filename</th><th>Rows</th>
+              <th>Imported</th><th>Updated</th><th>Dupes</th>
+              <th>Rejected</th><th>Status</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="history-body"></tbody>
+        </table>
+      </div>
+      <div class="pagination">
+        <button id="btn-prev" class="btn btn-secondary" style="padding:5px 12px" disabled>&#8592; Prev</button>
+        <span id="page-info"></span>
+        <button id="btn-next" class="btn btn-secondary" style="padding:5px 12px" disabled>Next &#8594;</button>
+      </div>
+    </div>
+
+    <!-- Batch detail panel -->
+    <div id="detail-panel" class="hidden" style="margin-top:16px;">
+      <hr class="divider">
+      <h3>Batch detail — <span id="detail-batch-id" class="muted" style="font-weight:400; font-size:.88rem;"></span></h3>
+      <div id="detail-body"></div>
+    </div>
+  </div><!-- /card -->
+
+</div><!-- /view-workspace -->
+
 <script>
-const tokenKey="jobyn.admin.access_token";
-const $=id=>document.getElementById(id);
-let previewReady=false;
-let confirmationToken=null;
-function authHeaders(){return {"Authorization":"Bearer "+sessionStorage.getItem(tokenKey)}}
-function mappingValue(){const text=$("mapping").value.trim();return text?text:null}
-async function api(path,options={}){
-  const headers=Object.assign(authHeaders(),options.headers||{});
-  const response=await fetch(path,Object.assign({},options,{headers}));
-  const data=await response.json().catch(()=>null);
-  if(!response.ok)throw new Error(data?.detail||"Request failed ("+response.status+").");
+"use strict";
+// ── Constants ──────────────────────────────────────────────────────────
+const TOKEN_KEY      = "jobyn.admin.access_token";
+const MAX_FILE_BYTES = 5 * 1024 * 1024;          // 5 MiB — mirrors backend cap
+const PAGE_SIZE      = 25;
+const PREVIEW_TTL    = 30 * 60;                   // 30 min in seconds
+
+// ── State ──────────────────────────────────────────────────────────────
+let previewReady     = false;
+let confirmationToken = null;
+let expiryTimestamp  = 0;                         // epoch seconds
+let expiryTimerId    = null;
+let historyPage      = 0;                         // 0-based
+let historyTotal     = 0;
+
+// ── Helpers ────────────────────────────────────────────────────────────
+const $  = id => document.getElementById(id);
+const el = tag => document.createElement(tag);
+
+function authHeaders() {
+  return { "Authorization": "Bearer " + sessionStorage.getItem(TOKEN_KEY) };
+}
+
+function mappingValue() {
+  const t = $("mapping").value.trim();
+  return t || null;
+}
+
+function show(id)    { $(id).classList.remove("hidden"); }
+function hide(id)    { $(id).classList.add("hidden"); }
+function vis(id, ok) { ok ? show(id) : hide(id); }
+function setBanner(id, text) {
+  const el = $(id);
+  el.textContent = text;
+  el.classList.toggle("visible", !!text);
+  vis(id, !!text);
+}
+
+async function apiFetch(path, options = {}) {
+  const headers = Object.assign(authHeaders(), options.headers || {});
+  const resp = await fetch(path, Object.assign({}, options, { headers }));
+  const data = await resp.json().catch(() => null);
+  if (!resp.ok) {
+    const msg = data?.detail || `Request failed (${resp.status})`;
+    throw Object.assign(new Error(typeof msg === "string" ? msg : JSON.stringify(msg)),
+                        { status: resp.status });
+  }
   return data;
 }
-function clearPreview(){
-  previewReady=false;
-  confirmationToken=null;
-  $("confirm-button").disabled=true;
-  $("preview-result").textContent="Preview cleared. Select and preview a CSV before confirming.";
-  $("row-errors").replaceChildren();
-  $("import-result").textContent="";
+
+function formatBytes(n) {
+  if (n < 1024) return n + " B";
+  if (n < 1048576) return (n / 1024).toFixed(1) + " KB";
+  return (n / 1048576).toFixed(2) + " MB";
 }
-async function signIn(){
-  $("login-message").textContent="";
-  try{
-    const response=await fetch("/api/v1/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:$("email").value,password:$("password").value})});
-    const data=await response.json().catch(()=>null);
-    if(!response.ok)throw new Error(data?.detail||"Sign-in failed.");
-    sessionStorage.setItem(tokenKey,data.access_token);
+
+function actionBadge(action) {
+  const b = el("span");
+  b.className = "badge " + (action === "new" ? "badge-new" : action === "update" ? "badge-upd" : "badge-dup");
+  b.textContent = action;
+  return b;
+}
+
+// ── Preview expiry countdown ────────────────────────────────────────────
+function startExpiryCountdown(durationSec) {
+  clearInterval(expiryTimerId);
+  expiryTimestamp = Math.floor(Date.now() / 1000) + durationSec;
+  const bar = $("expiry-bar");
+  bar.style.width = "100%";
+  bar.style.background = "var(--ok)";
+
+  expiryTimerId = setInterval(() => {
+    const remaining = expiryTimestamp - Math.floor(Date.now() / 1000);
+    if (remaining <= 0) {
+      clearInterval(expiryTimerId);
+      $("expiry-seconds").textContent = "expired";
+      bar.style.width = "0%";
+      if (previewReady) {
+        previewReady = false;
+        $("btn-import").disabled = true;
+        setBanner("preview-error", "Preview has expired. Please preview again before importing.");
+        show("preview-error");
+      }
+      return;
+    }
+    const pct = (remaining / PREVIEW_TTL) * 100;
+    bar.style.width = pct + "%";
+    bar.style.background = pct > 40 ? "var(--ok)" : pct > 15 ? "var(--warn)" : "var(--danger)";
+    const m = String(Math.floor(remaining / 60)).padStart(2, "0");
+    const s = String(remaining % 60).padStart(2, "0");
+    $("expiry-seconds").textContent = m + ":" + s;
+  }, 1000);
+}
+
+function stopExpiryCountdown() {
+  clearInterval(expiryTimerId);
+  expiryTimerId = null;
+}
+
+// ── Auth ────────────────────────────────────────────────────────────────
+async function signIn() {
+  setBanner("login-error", "");
+  $("btn-login").disabled = true;
+  $("btn-login").textContent = "Signing in…";
+  try {
+    const resp = await fetch("/api/v1/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: $("email").value, password: $("password").value }),
+    });
+    const data = await resp.json().catch(() => null);
+    if (!resp.ok) throw new Error(data?.detail || "Sign-in failed.");
+    sessionStorage.setItem(TOKEN_KEY, data.access_token);
     await loadWorkspace();
-  }catch(error){$("login-message").className="error";$("login-message").textContent=error.message}
-}
-async function loadWorkspace(){
-  try{
-    const user=await api("/api/v1/auth/me");
-    if(user.role!=="admin")throw new Error("Administrator access required.");
-    $("admin-email").textContent=user.email;
-    $("login").classList.add("hidden");
-    $("workspace").classList.remove("hidden");
-    await loadHistory();
-  }catch(error){
-    sessionStorage.removeItem(tokenKey);
-    $("workspace").classList.add("hidden");
-    $("login").classList.remove("hidden");
-    $("login-message").className="error";
-    $("login-message").textContent=error.message;
+  } catch (err) {
+    setBanner("login-error", err.message);
+    $("btn-login").disabled = false;
+    $("btn-login").textContent = "Sign in";
   }
 }
-function formData(includeConfirmation=false){
-  const file=$("csv-file").files[0];
-  if(!file)throw new Error("Choose a CSV file first.");
-  const data=new FormData();data.append("file",file);
-  const mapping=mappingValue();if(mapping)data.append("column_mapping",mapping);
-  if(includeConfirmation&&confirmationToken)data.append("confirmation_token",confirmationToken);
-  return data;
+
+async function loadWorkspace() {
+  try {
+    const user = await apiFetch("/api/v1/auth/me");
+    if (user.role !== "admin") throw new Error("Administrator access required.");
+    $("admin-email").textContent = user.email;
+    hide("view-login");
+    show("view-workspace");
+    loadHistory();
+  } catch (err) {
+    sessionStorage.removeItem(TOKEN_KEY);
+    show("view-login");
+    hide("view-workspace");
+    setBanner("login-error", err.message);
+  }
 }
-async function previewCsv(){
+
+function signOut() {
+  sessionStorage.removeItem(TOKEN_KEY);
+  stopExpiryCountdown();
+  location.reload();
+}
+
+// ── File validation ─────────────────────────────────────────────────────
+function validateFile(file) {
+  if (!file) return null;
+  if (!file.name.toLowerCase().endsWith(".csv"))
+    return "File must have a .csv extension.";
+  if (file.size === 0)
+    return "File is empty.";
+  if (file.size > MAX_FILE_BYTES)
+    return `File is too large (${formatBytes(file.size)}). Maximum is 5 MiB.`;
+  return null;                                    // valid
+}
+
+function onFileChange() {
   clearPreview();
-  try{
-    const result=await api("/api/v1/admin/jobs/csv/preview",{method:"POST",body:formData()});
-    confirmationToken=result.confirmation_token;
-    $("preview-result").textContent=JSON.stringify({
-      filename:result.filename,
-      rows_detected:result.rows_detected,
-      valid_rows:result.valid_rows,
-      invalid_rows:result.invalid_rows,
-      duplicate_rows:result.duplicate_rows,
-      ready_to_import:result.ready_to_import
-    },null,2);
-    $("row-errors").replaceChildren();
-    const recordTable=document.createElement("table");
-    const recordHead=document.createElement("tr");
-    for(const label of ["Row","Title","Company","Location","Source","Listing domain","Apply link","Action"]){
-      const cell=document.createElement("th");cell.textContent=label;recordHead.appendChild(cell);
-    }
-    const recordHeader=document.createElement("thead");recordHeader.appendChild(recordHead);recordTable.appendChild(recordHeader);
-    const recordBody=document.createElement("tbody");
-    for(const record of result.records){
-      const row=document.createElement("tr");
-      for(const value of [record.row,record.title,record.company,record.location,record.source_name,record.source_url_domain,record.application_url_present?"Present":"Not supplied",record.existing_action]){
-        const cell=document.createElement("td");cell.textContent=String(value);row.appendChild(cell);
-      }
-      recordBody.appendChild(row);
-    }
-    recordTable.appendChild(recordBody);
-    $("row-errors").appendChild(recordTable);
-    if(result.errors.length){
-      const list=document.createElement("ul");
-      for(const issue of result.errors){
-        const item=document.createElement("li");
-        item.textContent="Row "+issue.row+" · "+issue.field+": "+issue.message;
-        list.appendChild(item);
-      }
-      $("row-errors").appendChild(list);
-    }
-    previewReady=result.ready_to_import>0&&result.invalid_rows===0;
-    $("confirm-button").disabled=!previewReady;
-    if(result.unmapped_columns.length){
-      $("row-errors").textContent+=" Unmapped columns: "+result.unmapped_columns.join(", ");
-    }
-  }catch(error){$("preview-result").textContent=error.message}
+  setBanner("file-error", "");
+  const file = $("csv-file").files[0];
+  if (!file) {
+    hide("file-info");
+    $("btn-preview").disabled = true;
+    return;
+  }
+  const err = validateFile(file);
+  if (err) {
+    setBanner("file-error", err);
+    hide("file-info");
+    $("btn-preview").disabled = true;
+    return;
+  }
+  $("file-name").textContent = file.name;
+  $("file-size").textContent = formatBytes(file.size);
+  show("file-info");
+  $("btn-preview").disabled = false;
 }
-async function confirmImport(){
-  if(!previewReady)return;
-  $("confirm-button").disabled=true;
-  try{
-    const result=await api("/api/v1/admin/jobs/csv/import",{method:"POST",body:formData(true)});
-    $("import-result").textContent=JSON.stringify(result,null,2);
-    previewReady=false;
-    confirmationToken=null;
-    $("confirm-button").disabled=true;
-    $("preview-result").textContent="Imported to isolated staging. These records have not been published to Jobyn.";
-    $("row-errors").replaceChildren();
-    await loadHistory();
-  }catch(error){
-    $("import-result").textContent=error.message;
-    $("confirm-button").disabled=!previewReady;
+
+// ── Preview ─────────────────────────────────────────────────────────────
+function clearPreview() {
+  previewReady       = false;
+  confirmationToken  = null;
+  stopExpiryCountdown();
+  $("btn-import").disabled = true;
+  $("btn-import").title    = "Preview the CSV first, then confirm the import";
+  hide("preview-result");
+  hide("preview-error");
+  hide("preview-loading");
+  hide("import-result");
+  hide("import-error");
+  hide("import-loading");
+  setBanner("preview-error", "");
+  setBanner("import-error", "");
+  $("records-body").replaceChildren();
+  $("error-list").replaceChildren();
+  $("import-result").replaceChildren();
+  $("import-result").classList.remove("visible");
+}
+
+async function previewCsv() {
+  const file = $("csv-file").files[0];
+  const fileErr = validateFile(file);
+  if (fileErr) { setBanner("file-error", fileErr); return; }
+
+  const mapping = mappingValue();
+  if (mapping !== null) {
+    try { JSON.parse(mapping); }
+    catch { setBanner("preview-error", "Column mapping is not valid JSON."); show("preview-error"); return; }
+  }
+
+  clearPreview();
+  $("btn-preview").disabled = true;
+  setButtonSpinner("btn-preview", "Analysing\u2026");
+  show("preview-loading");
+
+  try {
+    const fd = new FormData();
+    fd.append("file", file);
+    if (mapping) fd.append("column_mapping", mapping);
+
+    const data = await apiFetch("/api/v1/admin/jobs/csv/preview", { method: "POST", body: fd });
+    hide("preview-loading");
+    renderPreview(data);
+  } catch (err) {
+    hide("preview-loading");
+    setBanner("preview-error", err.message);
+    show("preview-error");
+  } finally {
+    $("btn-preview").disabled = false;
+    $("btn-preview").textContent = "Preview CSV";
   }
 }
-async function loadHistory(){
-  try{
-    const batches=await api("/api/v1/admin/jobs/csv/imports");
-    const host=$("history");host.replaceChildren();
-    if(!batches.length){host.textContent="No CSV imports yet.";return}
-    const table=document.createElement("table");
-    const head=document.createElement("tr");
-    for(const label of ["Created","Filename","Rows","Imported","Updated","Duplicates","Rejected",""]){
-      const cell=document.createElement("th");cell.textContent=label;head.appendChild(cell);
+
+function renderPreview(data) {
+  confirmationToken = data.confirmation_token;
+
+  // Stats
+  $("prev-filename").textContent = data.filename;
+  setText("s-detected",   data.rows_detected);
+  setText("s-ready",      data.ready_to_import);
+  setText("s-invalid",    data.invalid_rows);
+  setText("s-duplicates", data.duplicate_rows);
+
+  // Colour hints
+  $("s-ready").className    = "stat-value " + (data.ready_to_import > 0 ? "ok" : "warn");
+  $("s-invalid").className  = "stat-value " + (data.invalid_rows > 0 ? "bad" : "ok");
+
+  // Unmapped
+  if (data.unmapped_columns && data.unmapped_columns.length) {
+    $("unmapped-msg").textContent =
+      "Unmapped columns (ignored): " + data.unmapped_columns.join(", ");
+    show("unmapped-wrap");
+  } else {
+    hide("unmapped-wrap");
+  }
+
+  // Errors
+  const errList = $("error-list");
+  errList.replaceChildren();
+  if (data.errors && data.errors.length) {
+    for (const e of data.errors) {
+      const li = el("li");
+      const rowRef   = el("span"); rowRef.className = "row-ref";   rowRef.textContent = "Row " + e.row;
+      const fieldRef = el("span"); fieldRef.className = "field-ref"; fieldRef.textContent = e.field;
+      const msg = el("span"); msg.textContent = ": " + e.message;
+      li.append(rowRef, " ", fieldRef, msg);
+      errList.appendChild(li);
     }
-    const thead=document.createElement("thead");thead.appendChild(head);table.appendChild(thead);
-    const body=document.createElement("tbody");
-    for(const batch of batches){
-      const row=document.createElement("tr");
-      for(const value of [new Date(batch.created_at).toLocaleString(),batch.filename,batch.row_count,batch.imported_count,batch.updated_count,batch.duplicate_count,batch.rejected_count]){
-        const cell=document.createElement("td");cell.textContent=String(value);row.appendChild(cell);
-      }
-      const action=document.createElement("td");
-      const button=document.createElement("button");button.className="secondary";button.textContent="Details";
-      button.onclick=()=>showBatch(batch.batch_id);action.appendChild(button);row.appendChild(action);body.appendChild(row);
+    show("errors-wrap");
+  } else {
+    hide("errors-wrap");
+  }
+
+  // Records table
+  const tbody = $("records-body");
+  tbody.replaceChildren();
+  if (data.records && data.records.length) {
+    for (const r of data.records) {
+      const tr = el("tr");
+      [
+        r.row,
+        r.title,
+        r.company,
+        r.location,
+        r.source_name,
+        r.source_url_domain,
+        r.application_url_present ? "Yes" : "—",
+      ].forEach(val => {
+        const td = el("td"); td.textContent = String(val); tr.appendChild(td);
+      });
+      const tdAction = el("td");
+      tdAction.appendChild(actionBadge(r.existing_action));
+      tr.appendChild(tdAction);
+      tbody.appendChild(tr);
     }
-    table.appendChild(body);host.appendChild(table);
-  }catch(error){$("history").textContent=error.message}
+    show("records-wrap");
+  } else {
+    hide("records-wrap");
+  }
+
+  show("preview-result");
+
+  // Enable import only if there's something to import and no invalid rows
+  previewReady = data.ready_to_import > 0 && data.invalid_rows === 0;
+  $("btn-import").disabled = !previewReady;
+  $("btn-import").title = previewReady
+    ? "Click to import the " + data.ready_to_import + " ready record(s) into isolated staging"
+    : data.invalid_rows > 0
+      ? "Fix the " + data.invalid_rows + " invalid row(s) before importing"
+      : "No records are ready to import";
+
+  startExpiryCountdown(PREVIEW_TTL);
 }
-async function showBatch(id){
-  try{$("batch-detail").textContent=JSON.stringify(await api("/api/v1/admin/jobs/csv/imports/"+encodeURIComponent(id)),null,2)}
-  catch(error){$("batch-detail").textContent=error.message}
+
+function setText(id, val) { $(id).textContent = String(val); }
+
+// ── Import ───────────────────────────────────────────────────────────────
+async function confirmImport() {
+  if (!previewReady || !confirmationToken) return;
+
+  const file = $("csv-file").files[0];
+  if (!file) { setBanner("import-error", "File is no longer available. Please re-select."); show("import-error"); return; }
+
+  $("btn-import").disabled  = true;
+  $("btn-preview").disabled = true;
+  setButtonSpinner("btn-import", "Importing\u2026");
+  show("import-loading");
+  hide("import-error");
+
+  try {
+    const mapping = mappingValue();
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("confirmation_token", confirmationToken);
+    if (mapping) fd.append("column_mapping", mapping);
+
+    const data = await apiFetch("/api/v1/admin/jobs/csv/import", { method: "POST", body: fd });
+    hide("import-loading");
+    stopExpiryCountdown();
+    previewReady      = false;
+    confirmationToken = null;
+    renderImportResult(data);
+    hide("preview-result");
+    loadHistory();
+  } catch (err) {
+    hide("import-loading");
+    setBanner("import-error",
+      err.status === 409
+        ? "Preview has expired or the file changed. Please preview again before importing."
+        : err.message);
+    show("import-error");
+    // Re-enable import only if preview is still fresh
+    $("btn-import").disabled  = !previewReady;
+    $("btn-preview").disabled = false;
+  } finally {
+    $("btn-import").textContent  = "Confirm Import";
+    $("btn-preview").textContent = "Preview CSV";
+  }
 }
-$("login-button").onclick=signIn;
-$("preview-button").onclick=previewCsv;
-$("confirm-button").onclick=confirmImport;
-$("cancel-button").onclick=clearPreview;
-$("refresh-history").onclick=loadHistory;
-$("logout").onclick=()=>{sessionStorage.removeItem(tokenKey);location.reload()};
-$("csv-file").onchange=clearPreview;
-$("mapping").oninput=clearPreview;
-if(sessionStorage.getItem(tokenKey))loadWorkspace();
+
+function renderImportResult(data) {
+  const card = $("import-result");
+  card.replaceChildren();
+
+  const heading = el("h3"); heading.textContent = "Import complete"; card.appendChild(heading);
+
+  const rows = [
+    ["Batch ID",           data.batch_id],
+    ["Filename",           data.filename],
+    ["Rows submitted",     data.rows_submitted],
+    ["Valid rows",         data.rows_valid],
+    ["Jobs created",       data.jobs_created],
+    ["Jobs updated",       data.jobs_updated],
+    ["Duplicates skipped", data.duplicates_skipped],
+    ["Rows rejected",      data.rows_rejected],
+    ["Status",             data.status],
+    ["Recorded at",        new Date(data.created_at).toLocaleString()],
+  ];
+  for (const [label, value] of rows) {
+    const row = el("div"); row.className = "result-row";
+    const lbl = el("span"); lbl.textContent = label;
+    const val = el("span"); val.textContent = String(value ?? "—");
+    row.appendChild(lbl); row.appendChild(val);
+    card.appendChild(row);
+  }
+
+  const note = el("p");
+  note.className = "muted";
+  note.style.marginTop = "10px";
+  note.textContent = "Records are in isolated staging only and are not visible to the public Jobyn platform.";
+  card.appendChild(note);
+
+  card.classList.add("visible");
+  show("import-result");
+}
+
+// ── History ──────────────────────────────────────────────────────────────
+async function loadHistory(page = historyPage) {
+  historyPage = page;
+  show("history-loading");
+  hide("history-error");
+  hide("history-empty");
+  hide("history-table-wrap");
+  hide("detail-panel");
+
+  try {
+    const offset = page * PAGE_SIZE;
+    const data   = await apiFetch(
+      `/api/v1/admin/jobs/csv/imports?limit=${PAGE_SIZE}&offset=${offset}`
+    );
+    hide("history-loading");
+    renderHistory(data);
+  } catch (err) {
+    hide("history-loading");
+    setBanner("history-error", err.message);
+    show("history-error");
+  }
+}
+
+function renderHistory(batches) {
+  if (!batches || batches.length === 0) {
+    if (historyPage === 0) {
+      show("history-empty");
+    } else {
+      // Last page was full, but there's nothing further — go back
+      historyPage = Math.max(0, historyPage - 1);
+      loadHistory(historyPage);
+    }
+    return;
+  }
+
+  const tbody = $("history-body");
+  tbody.replaceChildren();
+
+  for (const b of batches) {
+    const tr = el("tr");
+    [
+      new Date(b.created_at).toLocaleString(),
+      b.filename || "—",
+      b.row_count,
+      b.imported_count,
+      b.updated_count,
+      b.duplicate_count,
+      b.rejected_count,
+    ].forEach(val => {
+      const td = el("td"); td.textContent = String(val); tr.appendChild(td);
+    });
+
+    // Status badge
+    const tdStatus = el("td");
+    const badge = el("span");
+    badge.className = "badge " + (b.status === "completed" ? "badge-new" : "badge-warn");
+    badge.textContent = b.status === "completed" ? "completed" : b.status;
+    tdStatus.appendChild(badge);
+    tr.appendChild(tdStatus);
+
+    // Detail button
+    const tdBtn = el("td");
+    const btn   = el("button");
+    btn.className   = "btn btn-secondary";
+    btn.style.padding = "4px 10px";
+    btn.style.fontSize = ".8rem";
+    btn.textContent = "Details";
+    btn.onclick     = () => loadBatchDetail(b.batch_id);
+    tdBtn.appendChild(btn);
+    tr.appendChild(tdBtn);
+
+    tbody.appendChild(tr);
+  }
+
+  show("history-table-wrap");
+
+  // Pagination
+  const hasPrev = historyPage > 0;
+  const hasNext = batches.length === PAGE_SIZE;       // full page → may be more
+  $("btn-prev").disabled = !hasPrev;
+  $("btn-next").disabled = !hasNext;
+  $("page-info").textContent = "Page " + (historyPage + 1);
+}
+
+async function loadBatchDetail(batchId) {
+  hide("detail-panel");
+  try {
+    const data = await apiFetch(`/api/v1/admin/jobs/csv/imports/${encodeURIComponent(batchId)}`);
+    renderBatchDetail(data);
+  } catch (err) {
+    setBanner("history-error", "Could not load batch detail: " + err.message);
+    show("history-error");
+  }
+}
+
+function renderBatchDetail(data) {
+  $("detail-batch-id").textContent = data.batch_id;
+  const body = $("detail-body");
+  body.replaceChildren();
+
+  const stats = el("div"); stats.className = "stat-grid";
+  [
+    ["Imported", data.imported_count],
+    ["Updated",  data.updated_count],
+    ["Dupes",    data.duplicate_count],
+    ["Rejected", data.rejected_count],
+  ].forEach(([label, val]) => {
+    const s = el("div"); s.className = "stat";
+    const v = el("div"); v.className = "stat-value"; v.textContent = String(val);
+    const l = el("div"); l.className = "stat-label"; l.textContent = label;
+    s.appendChild(v); s.appendChild(l); stats.appendChild(s);
+  });
+  body.appendChild(stats);
+
+  if (data.sources && data.sources.length) {
+    const h = el("h3"); h.textContent = "Sources"; body.appendChild(h);
+    const wrap = el("div"); wrap.className = "table-wrap";
+    const tbl  = el("table");
+    const thead = el("thead");
+    const hrow  = el("tr");
+    ["Source name", "Observations"].forEach(t => {
+      const th = el("th"); th.textContent = t; hrow.appendChild(th);
+    });
+    thead.appendChild(hrow); tbl.appendChild(thead);
+    const tbdy = el("tbody");
+    for (const s of data.sources) {
+      const tr = el("tr");
+      const td1 = el("td"); td1.textContent = s.source_name || "—";
+      const td2 = el("td"); td2.textContent = String(s.observations ?? "—");
+      tr.appendChild(td1); tr.appendChild(td2); tbdy.appendChild(tr);
+    }
+    tbl.appendChild(tbdy); wrap.appendChild(tbl); body.appendChild(wrap);
+  }
+
+  const meta = el("p"); meta.className = "muted";
+  meta.style.marginTop = "10px";
+  meta.textContent = "Recorded at " + new Date(data.created_at).toLocaleString()
+    + " · " + (data.errors_retained ? "Row errors retained." : "Row errors not retained.");
+  body.appendChild(meta);
+
+  show("detail-panel");
+}
+
+// ── Button spinner helper (DOM-only, no innerHTML) ───────────────────────
+function setButtonSpinner(id, label) {
+  const btn = $(id);
+  btn.replaceChildren();
+  const spinEl = el("span");
+  spinEl.className = "spin";
+  const txtEl = document.createTextNode("\u00a0" + label);
+  btn.appendChild(spinEl);
+  btn.appendChild(txtEl);
+}
+
+// ── Event wiring ─────────────────────────────────────────────────────────
+$("btn-login").onclick     = signIn;
+$("btn-logout").onclick    = signOut;
+$("btn-preview").onclick   = previewCsv;
+$("btn-cancel").onclick    = () => { clearPreview(); $("btn-preview").disabled = !($("csv-file").files[0]); };
+$("btn-import").onclick    = confirmImport;
+$("btn-refresh").onclick   = () => loadHistory(0);
+$("btn-prev").onclick      = () => loadHistory(historyPage - 1);
+$("btn-next").onclick      = () => loadHistory(historyPage + 1);
+$("csv-file").onchange     = onFileChange;
+$("mapping").oninput       = clearPreview;
+
+// Enter key on login form
+["email","password"].forEach(id => {
+  $(id).addEventListener("keydown", e => { if (e.key === "Enter") signIn(); });
+});
+
+// ── Boot ──────────────────────────────────────────────────────────────────
+(function boot() {
+  if (sessionStorage.getItem(TOKEN_KEY)) {
+    hide("view-login");
+    loadWorkspace();
+  }
+})();
 </script>
 </body>
 </html>
