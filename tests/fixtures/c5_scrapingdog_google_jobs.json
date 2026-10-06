@@ -1,0 +1,47 @@
+{
+  "jobs_results": [
+    {
+      "title": "Software Engineer",
+      "company_name": "Example Zambia Ltd",
+      "location": "Lusaka, Zambia",
+      "via": "Example careers page",
+      "description": "Build and maintain public service applications.",
+      "job_highlights": [
+        {
+          "title": "Qualifications",
+          "items": ["Python experience", "Relevant degree"]
+        }
+      ],
+      "extensions": ["Full-time", "Posted 2 days ago"],
+      "posted_at": "2026-09-30",
+      "deadline": "2026-10-31",
+      "job_id": "google-job-001",
+      "share_link": "https://www.google.com/search?q=example-job-001",
+      "apply_links": [
+        {
+          "title": "Apply on employer site",
+          "link": "https://careers.example.zm/jobs/001"
+        }
+      ]
+    },
+    {
+      "title": "Electrical Technician",
+      "company_name": "Copperbelt Utilities",
+      "location": "Kitwe, Zambia",
+      "description": "Maintain electrical equipment.",
+      "requirements": "Trade certification required.",
+      "job_id": "google-job-002",
+      "share_link": "https://www.google.com/search?q=example-job-002",
+      "apply_links": []
+    },
+    {
+      "title": "Analyst",
+      "company_name": "Regional Employer",
+      "location": "Nairobi, Kenya",
+      "description": "Regional operations analyst.",
+      "job_id": "google-job-003",
+      "share_link": "https://www.google.com/search?q=example-job-003",
+      "apply_links": []
+    }
+  ]
+}

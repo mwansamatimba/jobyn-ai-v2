@@ -1,0 +1,41 @@
+{
+  "totalCount": 2,
+  "result": [
+    {
+      "id": "techmap-zm-001",
+      "title": "Software Engineer",
+      "company": "Lusaka Technology Ltd",
+      "countryCode": "zm",
+      "city": "Lusaka",
+      "workPlace": "Lusaka",
+      "industry": "Information Technology",
+      "skills": ["Python", "FastAPI"],
+      "dateCreated": "2026-09-30T08:00:00Z",
+      "dateActive": "2026-09-30T08:00:00Z",
+      "dateExpired": "2026-10-30T23:59:59Z",
+      "portal": "Example Careers",
+      "source": "Example employer listing",
+      "sourceUrl": "https://example.zm/jobs/techmap-zm-001",
+      "applicationUrl": "https://example.zm/jobs/techmap-zm-001/apply",
+      "description": "Build and maintain services.",
+      "qualifications": ["Degree in Computer Science"],
+      "isDuplicate": false
+    },
+    {
+      "id": "techmap-ke-002",
+      "title": "Accountant",
+      "company": "Nairobi Group",
+      "countryCode": "ke",
+      "city": "Nairobi",
+      "workPlace": "Nairobi",
+      "industry": "Finance",
+      "skills": ["Accounting"],
+      "dateCreated": "2026-09-29T08:00:00Z",
+      "portal": "Example Careers",
+      "source": "Example employer listing",
+      "sourceUrl": "https://example.ke/jobs/techmap-ke-002",
+      "applicationUrl": "https://example.ke/jobs/techmap-ke-002/apply",
+      "description": "Manage accounts."
+    }
+  ]
+}
