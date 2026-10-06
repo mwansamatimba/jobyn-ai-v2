@@ -43,3 +43,54 @@ __all__ = [
     "run_experiment",
     "run_ingestion",
 ]
+from backend.ingestion.c5 import C5ImportResult, run_c5_experiment_import
+from backend.ingestion.config import C5ExperimentConfig
+from backend.ingestion.retrieval import (
+    C5HttpClient,
+    C5HttpResponse,
+    C5RequestGovernor,
+    C5RetrievalError,
+    C5RetrievalTarget,
+    C5ScrapingdogError,
+    C5ScrapingdogGoogleJobsProvider,
+    GoZambiaJobsParser,
+    JobZambiaParser,
+    PublicInstitutionParser,
+    ZambiaJobParser,
+    run_c5_retrieval,
+    run_scrapingdog_google_jobs,
+)
+from backend.ingestion.techmap import (
+    TechmapConfig,
+    TechmapError,
+    TechmapProvider,
+    TechmapRunResult,
+    run_techmap_once,
+)
+
+__all__ = [
+    "C5ExperimentConfig",
+    "C5HttpClient",
+    "C5HttpResponse",
+    "C5ImportResult",
+    "C5RequestGovernor",
+    "C5RetrievalError",
+    "C5RetrievalTarget",
+    "C5ScrapingdogError",
+    "C5ScrapingdogGoogleJobsProvider",
+    "GoZambiaJobsParser",
+    "JobZambiaParser",
+    "PublicInstitutionParser",
+    "ZambiaJobParser",
+    "run_c5_experiment_import",
+    "run_c5_retrieval",
+    "run_scrapingdog_google_jobs",
+]
+
+__all__ += [
+    "TechmapConfig",
+    "TechmapError",
+    "TechmapProvider",
+    "TechmapRunResult",
+    "run_techmap_once",
+]

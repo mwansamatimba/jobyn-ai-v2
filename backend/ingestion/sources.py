@@ -81,6 +81,18 @@ SOURCE_REGISTRY: dict[str, IngestionSource] = {
         experiment_allowed=True,
         fallback_only=True,
     ),
+    "scrapingdog_google_jobs": _source(
+        "scrapingdog_google_jobs",
+        PermissionStatus.PERMISSION_REQUIRED,
+        active=False,
+        experiment_allowed=True,
+    ),
+    "techmap_daily_international": _source(
+        "techmap_daily_international",
+        PermissionStatus.PERMISSION_REQUIRED,
+        active=False,
+        experiment_allowed=True,
+    ),
 }
 
 ALLOWLISTED_EXPERIMENT_SOURCES = frozenset(
@@ -101,3 +113,34 @@ def classify_source(name: str) -> IngestionSource:
     if source is None:
         raise ValueError(f"unknown ingestion source: {name}")
     return source
+
+
+SOURCE_CAPS = {
+    "go_zambia_jobs": 15,
+    "jobzambia": 15,
+    "zambian_public_institution": 10,
+    "zambiajob": 10,
+    "scrapingdog_google_jobs": 50,
+    "techmap_daily_international": 50,
+}
+EXPERIMENT_SOURCES = frozenset(SOURCE_CAPS)
+SOURCE_NAMESPACES = {
+    name: f"experiment.{name}" for name in EXPERIMENT_SOURCES
+}
+PUBLIC_INSTITUTION_DOMAINS = {
+    "zamstats": ("zamstats.gov.zm",),
+}
+
+
+def namespace_for(source_name: str, institution_id: str | None = None) -> str:
+    if source_name not in EXPERIMENT_SOURCES:
+        raise ValueError(f"source is not allowed for C5: {source_name}")
+    if source_name == "zambian_public_institution":
+        if not institution_id or ":" in institution_id or not institution_id.strip():
+            raise ValueError("a specific public institution identifier is required")
+        if institution_id.strip().lower() not in PUBLIC_INSTITUTION_DOMAINS:
+            raise ValueError("public institution is not configured for C5")
+        return f"{SOURCE_NAMESPACES[source_name]}:{institution_id.strip().lower()}"
+    if institution_id:
+        raise ValueError("institution_id is only valid for public institutions")
+    return SOURCE_NAMESPACES[source_name]
