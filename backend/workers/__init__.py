@@ -1,1 +1,0 @@
-"""Async worker package (Celery)."""
